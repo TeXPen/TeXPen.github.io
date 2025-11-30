@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+  <link rel="stylesheet" href="/static/style.css?v=2">
+</head>
+
+<body>
+  <div class="container">
+    <header>
+      <h1>TexTeller Live</h1>
+      <p>Write math, get LaTeX.</p>
+    </header>
+
+    <main>
+      <div class="canvas-container">
+        <canvas id="drawing-canvas"></canvas>
+        <div class="toolbar">
+          <button id="clear-btn" class="btn secondary">Clear</button>
+          <button id="undo-btn" class="btn secondary">Undo</button>
+        </div>
+      </div>
+
+      <div class="output-container">
+        <div id="katex-output" class="katex-display"></div>
+        <div class="latex-code-container">
+          <textarea id="latex-code" readonly placeholder="LaTeX code will appear here..."></textarea>
+          <button id="copy-btn" class="btn primary">Copy</button>
+        </div>
+      </div>
+    </main>
+  </div>
+  <script src="/static/script.js?v=2"></script>
+</body>
+
+</html>

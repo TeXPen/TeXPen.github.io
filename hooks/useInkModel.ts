@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { ModelConfig, ModelStatus, Candidate } from '../types';
-import { DEFAULT_CONFIG, initModel, runInference, generateVariations } from '../services/onnxService';
+import { DEFAULT_CONFIG, initModel, runInference, generateVariations, clearModelCache } from '../services/onnxService';
 import { areModelsCached } from '../services/cacheService';
 
 export const useInkModel = (theme: 'dark' | 'light') => {
@@ -10,24 +10,29 @@ export const useInkModel = (theme: 'dark' | 'light') => {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [progress, setProgress] = useState<number>(0);
   const [loadingPhase, setLoadingPhase] = useState<string>('Initializing');
+  
   const [userConfirmed, setUserConfirmedState] = useState<boolean>(
     () => localStorage.getItem('userConfirmed') === 'true'
   );
+
   const isInitializing = useRef(false);
   const isInitialized = useRef(false);
 
+  // Auto-confirm if models exist in cache
   useEffect(() => {
-    // If user has not confirmed, check if models are already cached
     if (!userConfirmed) {
       const checkCache = async () => {
-        const cached = await areModelsCached([
-          DEFAULT_CONFIG.encoderModelUrl,
-          DEFAULT_CONFIG.decoderModelUrl,
-        ]);
-        if (cached) {
-          // If models are in cache, we can skip the user confirmation prompt
-          setUserConfirmedState(true);
-          localStorage.setItem('userConfirmed', 'true');
+        try {
+          const cached = await areModelsCached([
+            DEFAULT_CONFIG.encoderModelUrl,
+            DEFAULT_CONFIG.decoderModelUrl,
+          ]);
+          if (cached) {
+            setUserConfirmedState(true);
+            localStorage.setItem('userConfirmed', 'true');
+          }
+        } catch (e) {
+          console.warn("Cache check failed:", e);
         }
       };
       checkCache();
@@ -36,20 +41,16 @@ export const useInkModel = (theme: 'dark' | 'light') => {
 
   const setUserConfirmed = (value: boolean) => {
     setUserConfirmedState(value);
-    if (value) {
-      localStorage.setItem('userConfirmed', 'true');
-    }
+    if (value) localStorage.setItem('userConfirmed', 'true');
   };
 
-  // Initialize model on mount or when provider changes
+  // Initialization Logic
   useEffect(() => {
-    // Wait for user confirmation before downloading
     if (!userConfirmed) return;
-
-    // Prevent duplicate initialization
     if (isInitializing.current || isInitialized.current) return;
 
     isInitializing.current = true;
+
     const load = async () => {
       try {
         await initModel(config, (phase, pct) => {
@@ -59,45 +60,45 @@ export const useInkModel = (theme: 'dark' | 'light') => {
         setStatus('ready');
         isInitialized.current = true;
       } catch (e) {
+        console.error("Initialization Error:", e);
         setStatus('error');
-        console.error(e);
       } finally {
         isInitializing.current = false;
       }
     };
+
     load();
-  }, [config, userConfirmed]); // Dependencies for re-initialization
+  }, [config, userConfirmed]);
 
   const offscreenCanvas = useRef<HTMLCanvasElement | null>(null);
   const offscreenCtx = useRef<CanvasRenderingContext2D | null>(null);
 
-  // Initialize offscreen canvas
   useEffect(() => {
     const canvas = document.createElement('canvas');
     canvas.width = config.imageSize;
     canvas.height = config.imageSize;
     offscreenCanvas.current = canvas;
-    offscreenCtx.current = canvas.getContext('2d');
+    offscreenCtx.current = canvas.getContext('2d', { willReadFrequently: true });
   }, [config.imageSize]);
 
   const runConfig = useMemo(() => ({ ...config, invert: theme === 'dark' }), [config, theme]);
 
-  const infer = useCallback(async (canvas: HTMLCanvasElement) => {
-    if (status !== 'ready' && status !== 'inferencing' || !offscreenCtx.current) return null;
+  const infer = useCallback(async (sourceCanvas: HTMLCanvasElement) => {
+    if ((status !== 'ready' && status !== 'inferencing') || !offscreenCtx.current) return null;
 
     setStatus('inferencing');
     try {
       const ctx = offscreenCtx.current;
       
-      // Preprocess based on theme (Dark theme = White ink -> needs normalization)
+      // Standardize input background based on theme
       if (theme === 'dark') {
         ctx.fillStyle = 'black';
         ctx.fillRect(0, 0, config.imageSize, config.imageSize);
-        ctx.drawImage(canvas, 0, 0, config.imageSize, config.imageSize);
+        ctx.drawImage(sourceCanvas, 0, 0, config.imageSize, config.imageSize);
       } else {
         ctx.fillStyle = 'white';
         ctx.fillRect(0, 0, config.imageSize, config.imageSize);
-        ctx.drawImage(canvas, 0, 0, config.imageSize, config.imageSize);
+        ctx.drawImage(sourceCanvas, 0, 0, config.imageSize, config.imageSize);
       }
       
       const imageData = ctx.getImageData(0, 0, config.imageSize, config.imageSize);
@@ -136,6 +137,7 @@ export const useInkModel = (theme: 'dark' | 'light') => {
     progress,
     loadingPhase,
     userConfirmed,
-    setUserConfirmed
+    setUserConfirmed,
+    resetCache: clearModelCache // Expose for UI troubleshooting
   };
 };

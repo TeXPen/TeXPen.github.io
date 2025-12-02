@@ -13,10 +13,25 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({ latex }) => {
     if (latex) navigator.clipboard.writeText(latex);
   };
 
+  const sanitizeLatex = (text: string) => {
+    // 1. Trim whitespace first so the regex anchors (^ and $) match correctly
+    let clean = text.trim();
+
+    // 2. Replace using [\s\S]* to match content even if it has newlines
+    //    We check the most specific delimiters (\[...\] and $$...$$) first.
+    clean = clean
+      .replace(/^\\\[([\s\S]*)\\\]$/, '$1') // Matches \[ ... \]
+      .replace(/^\$\$([\s\S]*)\$\$$/, '$1') // Matches $$ ... $$
+      .replace(/^\\\(([\s\S]*)\\\)$/, '$1') // Matches \( ... \)
+      .replace(/^\$([\s\S]*)\$$/, '$1');    // Matches $ ... $
+
+    return clean.trim();
+  };
+
   return (
     <div className="h-[30%] md:h-[35%] relative flex flex-col items-center justify-center bg-gradient-to-b from-white/[0.2] dark:from-white/[0.02] to-transparent z-10">
         <div id="latex-output" className="w-full text-center text-2xl md:text-5xl text-slate-800 dark:text-white px-8 py-4 overflow-x-auto overflow-y-hidden scrollbar-hide">
-            {latex ? `\\[${latex}\\]` : <span className="text-slate-300 dark:text-white/10 font-light italic text-xl">Equation preview...</span>}
+            {latex ? `\\[${sanitizeLatex(latex)}\\]` : <span className="text-slate-300 dark:text-white/10 font-light italic text-xl">Equation preview...</span>}
         </div>
         
         {/* Action Bar overlay */}

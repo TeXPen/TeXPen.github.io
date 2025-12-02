@@ -18,7 +18,6 @@ export const useInkModel = (theme: 'dark' | 'light') => {
   const isInitializing = useRef(false);
   const isInitialized = useRef(false);
 
-  // Auto-confirm if models exist in cache
   useEffect(() => {
     if (!userConfirmed) {
       const checkCache = async () => {
@@ -44,7 +43,7 @@ export const useInkModel = (theme: 'dark' | 'light') => {
     if (value) localStorage.setItem('userConfirmed', 'true');
   };
 
-  // Initialization Logic
+  // Initialize Model
   useEffect(() => {
     if (!userConfirmed) return;
     if (isInitializing.current || isInitialized.current) return;
@@ -81,7 +80,8 @@ export const useInkModel = (theme: 'dark' | 'light') => {
     offscreenCtx.current = canvas.getContext('2d', { willReadFrequently: true });
   }, [config.imageSize]);
 
-  const runConfig = useMemo(() => ({ ...config, invert: theme === 'dark' }), [config, theme]);
+  // Force invert to FALSE. We handle pixel normalization manually in infer().
+  const runConfig = useMemo(() => ({ ...config, invert: false }), [config]);
 
   const infer = useCallback(async (sourceCanvas: HTMLCanvasElement) => {
     if ((status !== 'ready' && status !== 'inferencing') || !offscreenCtx.current) return null;
@@ -89,23 +89,66 @@ export const useInkModel = (theme: 'dark' | 'light') => {
     setStatus('inferencing');
     try {
       const ctx = offscreenCtx.current;
+      const size = config.imageSize;
+
+      // 1. Clear the offscreen canvas (Transparent)
+      ctx.clearRect(0, 0, size, size);
       
-      // Standardize input background based on theme
-      if (theme === 'dark') {
-        ctx.fillStyle = 'black';
-        ctx.fillRect(0, 0, config.imageSize, config.imageSize);
-        ctx.drawImage(sourceCanvas, 0, 0, config.imageSize, config.imageSize);
-      } else {
-        ctx.fillStyle = 'white';
-        ctx.fillRect(0, 0, config.imageSize, config.imageSize);
-        ctx.drawImage(sourceCanvas, 0, 0, config.imageSize, config.imageSize);
+      // 2. Draw the user's raw strokes (scaled)
+      // Note: We do NOT fill with white first. We want to preserve transparency 
+      // so we can distinguish background from ink.
+      ctx.drawImage(sourceCanvas, 0, 0, size, size);
+      
+      // 3. Get raw pixel data
+      const imageData = ctx.getImageData(0, 0, size, size);
+      const data = imageData.data;
+
+      // 4. PIXEL PIPELINE: Normalize to "Black Ink on White Background"
+      // This fixes the "Black on Black" issue in Dark Mode.
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i + 1];
+        const b = data[i + 2];
+        const a = data[i + 3];
+
+        // Determine if pixel is effectively background
+        const isTransparent = a < 50;
+        const avg = (r + g + b) / 3;
+
+        if (theme === 'dark') {
+           // DARK MODE: Ink is White (High value), Background is Transparent or Dark.
+           if (isTransparent) {
+             // Transparent -> Force White Background
+             data[i] = 255; data[i+1] = 255; data[i+2] = 255; data[i+3] = 255;
+           } else if (avg > 100) {
+             // Bright Pixel (Ink) -> Force BLACK
+             data[i] = 0; data[i+1] = 0; data[i+2] = 0; data[i+3] = 255;
+           } else {
+             // Dark Pixel (Canvas artifacts) -> Force WHITE
+             data[i] = 255; data[i+1] = 255; data[i+2] = 255; data[i+3] = 255;
+           }
+        } else {
+           // LIGHT MODE: Ink is Black (Low value), Background is Transparent or White.
+           if (isTransparent) {
+             // Transparent -> Force White Background
+             data[i] = 255; data[i+1] = 255; data[i+2] = 255; data[i+3] = 255;
+           } else if (avg < 150) {
+             // Dark Pixel (Ink) -> Force BLACK
+             data[i] = 0; data[i+1] = 0; data[i+2] = 0; data[i+3] = 255;
+           } else {
+             // Bright Pixel (Background) -> Force WHITE
+             data[i] = 255; data[i+1] = 255; data[i+2] = 255; data[i+3] = 255;
+           }
+        }
       }
       
-      const imageData = ctx.getImageData(0, 0, config.imageSize, config.imageSize);
+      // 5. Put the normalized image back
+      ctx.putImageData(imageData, 0, 0);
 
+      // 6. Run Inference
       const resultLatex = await runInference(imageData, runConfig);
+      
       const vars = generateVariations(resultLatex);
-
       const newCandidates = vars.map((l, i) => ({ id: i, latex: l }));
       setCandidates(newCandidates);
       setLatex(vars[0]);
@@ -113,7 +156,7 @@ export const useInkModel = (theme: 'dark' | 'light') => {
 
       return { latex: vars[0], candidates: newCandidates };
     } catch (e) {
-      console.error(e);
+      console.error("Inference Error:", e);
       setStatus('error');
       return null;
     }
@@ -138,6 +181,6 @@ export const useInkModel = (theme: 'dark' | 'light') => {
     loadingPhase,
     userConfirmed,
     setUserConfirmed,
-    resetCache: clearModelCache // Expose for UI troubleshooting
+    resetCache: clearModelCache
   };
 };

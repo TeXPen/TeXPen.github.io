@@ -21,13 +21,12 @@ interface Tokenizer {
 let tokenizer: Tokenizer | null = null;
 let reverseTokenizer: { [id: number]: string } = {};
 
-// 3. EXACT CONFIGURATION FROM JSON FILES
+// 3. EXACT CONFIGURATION (448x448, Specific Mean/Std)
 export const DEFAULT_CONFIG: ModelConfig = {
   encoderModelUrl: 'https://huggingface.co/OleehyO/TexTeller/resolve/main/encoder_model.onnx',
   decoderModelUrl: 'https://huggingface.co/OleehyO/TexTeller/resolve/main/decoder_model_merged.onnx',
   tokenizerUrl: 'https://huggingface.co/OleehyO/TexTeller/resolve/main/tokenizer.json',
   
-  // CRITICAL: Updated based on config.json and preprocessor_config.json
   imageSize: 448, 
   mean: [0.9545467], 
   std: [0.15394445],
@@ -35,7 +34,7 @@ export const DEFAULT_CONFIG: ModelConfig = {
   encoderInputName: 'pixel_values',
   decoderInputName: 'input_ids',
   decoderOutputName: 'logits',
-  invert: false,
+  invert: false, // Logic handled in useInkModel now
   eosToken: '</s>',
   bosToken: '<s>',
   padToken: '<pad>',
@@ -121,7 +120,6 @@ export const runInference = async (
     const maxSteps = 40; 
 
     // 4. Create KV Cache (Dimensions from config.json: 16 heads, 1024 hidden size)
-    // head_dim = 1024 / 16 = 64
     const dummyPast = createPastKeyValues(decoderSession, 16, 64);
 
     // 5. Decode Loop
@@ -173,8 +171,6 @@ export const runInference = async (
   }
 };
 
-// --- Image Processing ---
-
 const preprocessImage = async (inputImageData: ImageData, config: ModelConfig): Promise<ort.Tensor> => {
   const targetSize = config.imageSize; // 448
 
@@ -186,43 +182,46 @@ const preprocessImage = async (inputImageData: ImageData, config: ModelConfig): 
 
   const bitmap = await createImageBitmap(inputImageData);
   
-  // Fill white background
+  // We assume inputImageData is already correct (Black on White) from useInkModel
+  // Just draw it on a white background to ensure size match and no alpha issues
   ctx.fillStyle = 'white';
   ctx.fillRect(0, 0, targetSize, targetSize);
   ctx.drawImage(bitmap, 0, 0, targetSize, targetSize);
 
+  // --- DEBUGGER START ---
+  canvas.style.position = 'fixed';
+  canvas.style.bottom = '0';
+  canvas.style.left = '0';
+  canvas.style.zIndex = '9999';
+  canvas.style.border = '2px solid red';
+  canvas.style.width = '200px'; 
+  canvas.style.height = '200px';
+  const existing = document.getElementById('debug-onnx-canvas');
+  if (existing) existing.remove();
+  canvas.id = 'debug-onnx-canvas';
+  document.body.appendChild(canvas);
+  // --- DEBUGGER END ---
+
   const resizedData = ctx.getImageData(0, 0, targetSize, targetSize);
   const { data } = resizedData;
 
-  // Float32 Array for 1 Channel (Grayscale)
   const floatData = new Float32Array(targetSize * targetSize);
 
   for (let i = 0; i < targetSize * targetSize; i++) {
     const rIdx = i * 4;
-    const gIdx = i * 4 + 1;
-    const bIdx = i * 4 + 2;
-
+    
+    // Note: Since we forced Black Ink on White BG in useInkModel:
+    // r=0 is Ink, r=255 is Background.
     let r = data[rIdx] / 255.0;
-    let g = data[gIdx] / 255.0;
-    let b = data[bIdx] / 255.0;
 
-    // Invert if Dark Mode (handled in hook, but safeguard here)
-    if (config.invert) {
-      r = 1.0 - r;
-      g = 1.0 - g;
-      b = 1.0 - b;
-    }
+    // We do NOT check config.invert here anymore.
 
-    // Grayscale
-    const gray = (r + g + b) / 3.0;
-
-    // Normalize using TexTeller specific mean/std
-    const norm = (gray - config.mean[0]) / config.std[0];
+    // Standard TexTeller Normalization
+    const norm = (r - config.mean[0]) / config.std[0];
 
     floatData[i] = norm;
   }
 
-  // Shape: [1, 1, 448, 448]
   return new ort.Tensor('float32', floatData, [1, 1, targetSize, targetSize]);
 };
 
@@ -235,7 +234,6 @@ const createPastKeyValues = (session: ort.InferenceSession, numHeads: number, he
 
   session.inputNames.forEach(name => {
     if (name.startsWith('past_key_values')) {
-      // [Batch, NumHeads, SeqLen, HeadDim]
       feeds[name] = new ort.Tensor(
         'float32', 
         new Float32Array(0), 

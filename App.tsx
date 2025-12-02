@@ -9,9 +9,12 @@ import HistorySidebar from './components/HistorySidebar';
 import OutputDisplay from './components/OutputDisplay';
 import CanvasArea from './components/CanvasArea';
 import LoadingOverlay from './components/LoadingOverlay';
+import DebugTest from './components/DebugTest'; // <--- Import the debug component
 
 const App: React.FC = () => {
     const { theme, toggleTheme } = useTheme();
+    
+    // Destructure inferFromUrl here
     const {
         config,
         setConfig,
@@ -20,12 +23,13 @@ const App: React.FC = () => {
         setLatex,
         candidates,
         infer,
+        inferFromUrl, // <--- Get the new test function
         clear: clearModel,
         progress,
         loadingPhase,
         userConfirmed,
         setUserConfirmed,
-        isLoadedFromCache 
+        isLoadedFromCache
     } = useInkModel(theme);
 
     const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -53,11 +57,6 @@ const App: React.FC = () => {
         setLatex(candidates[idx].latex);
     };
 
-    // --- New Handler for Deletion ---
-    const handleDeleteHistory = (id: string) => {
-        setHistory(prev => prev.filter(item => item.id !== id));
-    };
-
     return (
         <div className="relative h-screen w-screen overflow-hidden font-sans bg-[#fafafa] dark:bg-black transition-colors duration-500">
             <LiquidBackground />
@@ -78,11 +77,10 @@ const App: React.FC = () => {
                     <HistorySidebar
                         history={history}
                         onSelect={handleLoadFromHistory}
-                        onDelete={handleDeleteHistory} /* Pass the delete handler here */
                         isOpen={isSidebarOpen}
                     />
 
-                    <div className="flex-1 flex flex-col min-w-0 z-10">
+                    <div className="flex-1 flex flex-col min-w-0 z-10 relative">
 
                         <OutputDisplay latex={latex} />
 
@@ -98,6 +96,16 @@ const App: React.FC = () => {
                             onStrokeEnd={handleInference}
                             onClear={clearModel}
                         />
+
+                        {/* 
+                            --- DEBUG COMPONENT --- 
+                            It will float in the bottom right corner of the canvas area 
+                        */}
+                        <DebugTest 
+                            onTest={inferFromUrl} 
+                            status={status} 
+                        />
+
                     </div>
 
                 </div>

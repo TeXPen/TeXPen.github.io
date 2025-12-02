@@ -15,7 +15,8 @@ interface ModelSessions {
 const fetchWithProgress = async (url: string, phase: string, onProgress?: (p: string, v: number) => void) => {
   const cachedData = await getModelFromCache(url);
   if (cachedData) {
-    if (onProgress) onProgress(phase, 100);
+    // Don't pass phase - let the aggregated progress handler determine the message
+    if (onProgress) onProgress('', 100);
     return cachedData;
   }
 
@@ -59,9 +60,50 @@ export const loadModelSessions = async (
   console.log(`Loading models (Image Size: ${config.imageSize})...`);
   if (onProgress) onProgress('Loading Models', 0);
 
+  // Check if models are cached
+  const encoderCached = await getModelFromCache(config.encoderModelUrl);
+  const decoderCached = await getModelFromCache(config.decoderModelUrl);
+  const bothCached = encoderCached && decoderCached;
+
+  if (bothCached) {
+    // Fast path: both models in cache
+    if (onProgress) onProgress('Loading from Cache', 50);
+
+    const [encoderSession, decoderSession] = await Promise.all([
+      ort.InferenceSession.create(encoderCached, options),
+      ort.InferenceSession.create(decoderCached, options)
+    ]);
+
+    console.log('Models Loaded from Cache. Ready for Inference.');
+    if (onProgress) onProgress('Ready', 100);
+    return { encoderSession, decoderSession };
+  }
+
+  // Track progress for both models separately
+  const progressState = {
+    encoder: 0,
+    decoder: 0
+  };
+
+  const updateAggregatedProgress = () => {
+    const totalProgress = Math.round((progressState.encoder + progressState.decoder) / 2);
+    if (onProgress) {
+      const phase = progressState.encoder < 100 ? 'Downloading Encoder' :
+        progressState.decoder < 100 ? 'Downloading Decoder' : 'Initializing Models';
+      onProgress(phase, totalProgress);
+    }
+  };
+
+  // Load both models in parallel with separate progress tracking
   const [encoderData, decoderData] = await Promise.all([
-    fetchWithProgress(config.encoderModelUrl, 'Loading Encoder', onProgress),
-    fetchWithProgress(config.decoderModelUrl, 'Loading Decoder', onProgress)
+    fetchWithProgress(config.encoderModelUrl, 'Downloading Encoder', (_, progress) => {
+      progressState.encoder = progress;
+      updateAggregatedProgress();
+    }),
+    fetchWithProgress(config.decoderModelUrl, 'Downloading Decoder', (_, progress) => {
+      progressState.decoder = progress;
+      updateAggregatedProgress();
+    })
   ]);
 
   const [encoderSession, decoderSession] = await Promise.all([

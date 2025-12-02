@@ -10,6 +10,7 @@ export const useInkModel = (theme: 'dark' | 'light') => {
   const [candidates, setCandidates] = useState<Candidate[]>([]);
   const [progress, setProgress] = useState<number>(0);
   const [loadingPhase, setLoadingPhase] = useState<string>('Initializing');
+  const [isLoadedFromCache, setIsLoadedFromCache] = useState<boolean>(false);
   
   const [userConfirmed, setUserConfirmedState] = useState<boolean>(
     () => localStorage.getItem('userConfirmed') === 'true'
@@ -18,25 +19,31 @@ export const useInkModel = (theme: 'dark' | 'light') => {
   const isInitializing = useRef(false);
   const isInitialized = useRef(false);
 
+  // Check cache status
   useEffect(() => {
-    if (!userConfirmed) {
-      const checkCache = async () => {
-        try {
-          const cached = await areModelsCached([
-            DEFAULT_CONFIG.encoderModelUrl,
-            DEFAULT_CONFIG.decoderModelUrl,
-          ]);
-          if (cached) {
-            setUserConfirmedState(true);
-            localStorage.setItem('userConfirmed', 'true');
-          }
-        } catch (e) {
-          console.warn("Cache check failed:", e);
+    const checkCache = async () => {
+      try {
+        const cached = await areModelsCached([
+          DEFAULT_CONFIG.encoderModelUrl,
+          DEFAULT_CONFIG.decoderModelUrl,
+        ]);
+        
+        setIsLoadedFromCache(cached);
+
+        // If models are cached, we can auto-confirm if not already confirmed
+        if (cached && !userConfirmed) {
+          setUserConfirmedState(true);
+          localStorage.setItem('userConfirmed', 'true');
         }
-      };
-      checkCache();
-    }
-  }, [userConfirmed]);
+      } catch (e) {
+        console.warn("Cache check failed:", e);
+      }
+    };
+    
+    checkCache();
+    // We only need to run this on mount or if userConfirmed changes 
+    // (though logically it mostly matters on mount)
+  }, []);
 
   const setUserConfirmed = (value: boolean) => {
     setUserConfirmedState(value);
@@ -181,6 +188,7 @@ export const useInkModel = (theme: 'dark' | 'light') => {
     loadingPhase,
     userConfirmed,
     setUserConfirmed,
-    resetCache: clearModelCache
+    resetCache: clearModelCache,
+    isLoadedFromCache // Export the cache status
   };
 };

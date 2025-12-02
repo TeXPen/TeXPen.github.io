@@ -24,7 +24,8 @@ const App: React.FC = () => {
         progress,
         loadingPhase,
         userConfirmed,
-        setUserConfirmed
+        setUserConfirmed,
+        isLoadedFromCache // Get cache status from hook
     } = useInkModel(theme);
 
     const [history, setHistory] = useState<HistoryItem[]>([]);
@@ -103,6 +104,7 @@ const App: React.FC = () => {
                     error={status === 'error' ? 'Failed to load models. Please check your internet connection and try again.' : undefined}
                     needsConfirmation={!userConfirmed}
                     onConfirm={() => setUserConfirmed(true)}
+                    isLoadedFromCache={isLoadedFromCache} // Pass prop here
                 />
             )}
         </div>

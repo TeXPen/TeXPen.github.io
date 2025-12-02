@@ -6,6 +6,7 @@ interface LoadingOverlayProps {
     error?: string;
     onConfirm?: () => void;
     needsConfirmation?: boolean;
+    isLoadedFromCache?: boolean;
 }
 
 const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
@@ -13,7 +14,8 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
     progress,
     error,
     onConfirm,
-    needsConfirmation = false
+    needsConfirmation = false,
+    isLoadedFromCache = false
 }) => {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -77,7 +79,10 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
                             </p>
                             {phase.includes('Encoder') || phase.includes('Decoder') ? (
                                 <p className="text-gray-500 dark:text-gray-500 text-xs mt-2">
-                                    Downloading large model files. This may take a few minutes...
+                                    {isLoadedFromCache 
+                                        ? "Restoring model from browser cache..." 
+                                        : "Downloading large model files. This may take a few minutes..."
+                                    }
                                 </p>
                             ) : null}
                         </>

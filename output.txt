@@ -4,17 +4,3 @@ Loading tokenizer...
 Loading model... (this may take a while)
 Ready
 Running inference...
-Inference failed: 88 |     public contains_splitting: boolean = false,
-89 |     public contains_comment: boolean = false
-90 |   ) { }
-91 | 
-92 |   static new(s: string): Pattern {
-93 |     if (RE_SPLITTING.test(s)) {
-             ^
-ReferenceError: RE_SPLITTING is not defined
-      at new (D:\GitHub\TeXFlow\InkTex\services\latexFormatter.ts:93:9)
-      at _formatLatex (D:\GitHub\TeXFlow\InkTex\services\latexFormatter.ts:547:29)
-      at formatLatex (D:\GitHub\TeXFlow\InkTex\services\latexFormatter.ts:513:27)
-      at postprocess (D:\GitHub\TeXFlow\InkTex\services\inferenceService.ts:245:17)
-      at async runTest (D:\GitHub\TeXFlow\InkTex\scripts\verify_inference.ts:55:43)
-

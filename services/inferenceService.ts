@@ -246,6 +246,17 @@ export class InferenceService {
 
     return processed;
   }
+
+  public async dispose(): Promise<void> {
+    if (this.model) {
+      if ('dispose' in this.model && typeof (this.model as any).dispose === 'function') {
+        await (this.model as any).dispose();
+      }
+      this.model = null;
+    }
+    this.tokenizer = null;
+    (InferenceService as any).instance = null;
+  }
 }
 
 export const inferenceService = InferenceService.getInstance();

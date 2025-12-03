@@ -586,8 +586,10 @@ function _formatLatex(oldText: string, file: string, args: Args): [string, Log[]
         const wrappedLines = applyWrap(line.trimStart(), indentLength, tempState, file, args, logs, pattern);
         if (wrappedLines) {
           const [thisLine, nextLineStart, nextLine] = wrappedLines;
-          queue.unshift({ linumOld, line: nextLineStart + nextLine });
+          // Python does: queue.insert(0, next_line) then queue.insert(0, this_line)
+          // So this_line ends up first. With unshift, we need to add in reverse order:
           queue.unshift({ linumOld, line: thisLine });
+          queue.unshift({ linumOld, line: nextLineStart + nextLine });
           continue;
         }
       }

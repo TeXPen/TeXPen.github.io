@@ -76,6 +76,10 @@ A&=\frac{\pi r^{2}}{2}\\
 
   } catch (error) {
     console.error('Inference failed:', error);
+  } finally {
+    console.log('Cleaning up...');
+    await inferenceService.dispose();
+    console.log('Done.');
   }
 }
 

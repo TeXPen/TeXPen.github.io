@@ -31,6 +31,7 @@ const Main: React.FC = () => {
         toggleSidebar,
         selectedIndex,
         selectCandidate,
+        isInferencing,
     } = useAppContext();
 
     const { theme, toggleTheme } = useThemeContext();
@@ -42,6 +43,10 @@ const Main: React.FC = () => {
             addToHistory({ id: Date.now().toString(), latex: result.latex, timestamp: Date.now() });
         }
     };
+
+    // Only show full overlay for initial model loading, not during inference
+    const isInitialLoading = status === 'loading' && loadingPhase.includes('model');
+    const showFullOverlay = isInitialLoading || status === 'error';
 
     return (
         <div className="relative h-screen w-screen overflow-hidden font-sans bg-[#fafafa] dark:bg-black transition-colors duration-500">
@@ -66,7 +71,7 @@ const Main: React.FC = () => {
                     />
 
                     <div className="flex-1 flex flex-col min-w-0 z-10 relative">
-                        <OutputDisplay latex={latex} />
+                        <OutputDisplay latex={latex} isInferencing={isInferencing} />
 
                         <Candidates
                             candidates={candidates}
@@ -81,15 +86,16 @@ const Main: React.FC = () => {
                             onClear={clearModel}
                         />
 
-                        <DebugTest
+                        {/* <DebugTest
                             onTest={inferFromUrl}
                             status={status}
-                        />
+                        /> */}
                     </div>
                 </div>
             </div>
 
-            {(status === 'loading' || status === 'error') && (
+            {/* Full overlay only for initial model loading or errors */}
+            {showFullOverlay && (
                 <LoadingOverlay
                     phase={loadingPhase}
                     progress={progress}

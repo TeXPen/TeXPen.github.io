@@ -16,6 +16,7 @@ interface AppContextType {
     inferFromUrl: (url: string) => Promise<void>;
     clearModel: () => void;
     loadingPhase: string;
+    isInferencing: boolean;
 
     // Sidebar
     isSidebarOpen: boolean;
@@ -47,6 +48,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         inferFromUrl,
         clear: clearModel,
         loadingPhase,
+        isInferencing,
     } = useInkModel(theme);
 
     const [selectedIndex, setSelectedIndex] = useState<number>(0);
@@ -78,6 +80,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         inferFromUrl,
         clearModel,
         loadingPhase,
+        isInferencing,
 
         // Sidebar
         isSidebarOpen,

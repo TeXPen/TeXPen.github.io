@@ -68,6 +68,9 @@ export class InferenceService {
       skip_special_tokens: true,
     });
 
+    console.log('[DEBUG] Raw generated text:', generatedText);
+    console.log('[DEBUG] Output token IDs:', outputTokenIds[0]);
+
     // 4. Post-process
     return this.postprocess(generatedText);
   }

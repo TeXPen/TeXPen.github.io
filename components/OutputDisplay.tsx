@@ -3,9 +3,10 @@ import { useMathJax } from '../hooks/useMathJax';
 
 interface OutputDisplayProps {
     latex: string;
+    isInferencing?: boolean;
 }
 
-const OutputDisplay: React.FC<OutputDisplayProps> = ({ latex }) => {
+const OutputDisplay: React.FC<OutputDisplayProps> = ({ latex, isInferencing = false }) => {
     // Trigger MathJax on latex change for specific container
     useMathJax(latex, 'latex-output');
 
@@ -31,9 +32,21 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({ latex }) => {
 
     return (
         <div className="h-[30%] md:h-[35%] relative flex flex-col items-center justify-center bg-gradient-to-b from-white/[0.2] dark:from-white/[0.02] to-transparent z-10">
-            <div id="latex-output" className="w-full text-center text-2xl md:text-5xl text-slate-800 dark:text-white px-8 py-4 overflow-x-auto overflow-y-hidden scrollbar-hide">
-                {/* The component adds the outer delimiters here, so sanitizeLatex must ensure the inside is clean */}
-                {latex ? `\\[${sanitizeLatex(latex)}\\]` : <span className="text-slate-300 dark:text-white/10 font-light italic text-xl">Equation preview...</span>}
+            <div id="latex-output" className="w-full text-center text-2xl md:text-5xl text-slate-800 dark:text-white px-8 py-4 overflow-x-auto overflow-y-auto scrollbar-thin">
+                {isInferencing ? (
+                    <div className="flex items-center justify-center gap-3 text-blue-500 dark:text-blue-400">
+                        {/* Animated spinner */}
+                        <div className="relative w-6 h-6">
+                            <div className="absolute inset-0 border-2 border-blue-500/30 dark:border-blue-400/30 rounded-full"></div>
+                            <div className="absolute inset-0 border-2 border-blue-500 dark:border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                        </div>
+                        <span className="font-medium text-lg animate-pulse">Generating LaTeX...</span>
+                    </div>
+                ) : latex ? (
+                    `\\[${sanitizeLatex(latex)}\\]`
+                ) : (
+                    <span className="text-slate-300 dark:text-white/10 font-light italic text-xl">Equation preview...</span>
+                )}
             </div>
 
             {/* ... existing Action Bar code ... */}
@@ -49,10 +62,6 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({ latex }) => {
                     </svg>
                 </button>
             </div>
-            <style>{`
-        .scrollbar-hide::-webkit-scrollbar { display: none; }
-        .scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
-      `}</style>
         </div>
     );
 };

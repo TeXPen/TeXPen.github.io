@@ -46,7 +46,7 @@ export function useInkModel(theme: 'light' | 'dark') {
 
   const infer = useCallback(async (canvas: HTMLCanvasElement) => {
     setIsInferencing(true);
-    setStatus('loading');
+    setStatus('inferencing'); // Use different status to avoid showing full overlay
 
     return new Promise<{ latex: string; candidates: Candidate[] } | null>((resolve, reject) => {
       canvas.toBlob(async (blob) => {
@@ -63,7 +63,7 @@ export function useInkModel(theme: 'light' | 'dark') {
             setStatus('success');
             resolve({ latex: res, candidates: [{ id: 0, latex: res }] });
           } else {
-            setStatus('error'); // Or remain idle?
+            setStatus('idle');
             resolve(null);
           }
         } catch (e) {

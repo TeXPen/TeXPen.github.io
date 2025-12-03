@@ -6,6 +6,7 @@
 
     --animate-blob: blob 20s infinite;
     --animate-fade-in: fadeIn 0.5s ease-out forwards;
+    --animate-slide-up: slideUp 0.3s ease-out forwards;
 }
 
 @keyframes blob {
@@ -35,6 +36,18 @@
     100% {
         opacity: 1;
         transform: translateY(0);
+    }
+}
+
+@keyframes slideUp {
+    0% {
+        opacity: 0;
+        transform: translate(-50%, 20px);
+    }
+
+    100% {
+        opacity: 1;
+        transform: translate(-50%, 0);
     }
 }
 

@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
 import { ModelConfig, Candidate } from '../types';
-import { inferenceService } from '../services/inferenceService';
+import { inferenceService } from '../services/inference/InferenceService';
 
 export function useInkModel(theme: 'light' | 'dark') {
   const [numCandidates, setNumCandidates] = useState<number>(5);

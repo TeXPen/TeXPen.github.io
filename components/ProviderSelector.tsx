@@ -13,7 +13,7 @@ interface ProviderSelectorProps {
 const providerOptions: { value: Provider, label: string }[] = [
     { value: 'webgpu', label: 'WebGPU (Fastest)' },
     { value: 'webgl', label: 'WebGL (Legacy GPU)' },
-    { value: 'wasm', label: 'WASM (CPU)' },
+    { value: 'wasm', label: 'WASM (Most Compatible, CPU)' },
 ];
 
 export function ProviderSelector({ value, onChange }: ProviderSelectorProps) {

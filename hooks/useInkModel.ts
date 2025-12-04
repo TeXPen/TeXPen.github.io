@@ -85,7 +85,7 @@ export function useInkModel(theme: 'light' | 'dark') {
         }
       }, 'image/png');
     });
-  }, [numCandidates]);
+  }, []);
 
   const inferFromUrl = useCallback(async (url: string) => {
     try {

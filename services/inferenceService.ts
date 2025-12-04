@@ -1,10 +1,11 @@
 import { AutoTokenizer, AutoModelForVision2Seq, PreTrainedModel, PreTrainedTokenizer, Tensor } from '@huggingface/transformers';
 import { removeStyle, addNewlines } from './latexUtils';
-import { trimWhiteBorder, resizeAndPad, FIXED_IMG_SIZE, IMAGE_MEAN, IMAGE_STD } from './imagePreprocessing';
 
 // Constants
 const MODEL_ID = 'onnx-community/TexTeller3-ONNX';
-
+const FIXED_IMG_SIZE = 448;
+const IMAGE_MEAN = 0.9545467;
+const IMAGE_STD = 0.15394445;
 
 export class InferenceService {
   private model: PreTrainedModel | null = null;
@@ -31,7 +32,7 @@ export class InferenceService {
       // Force browser cache usage and allow remote models
       this.model = await AutoModelForVision2Seq.from_pretrained(MODEL_ID, {
         device: options.device || 'webgpu', // Try WebGPU first, fallback to wasm automatically
-        dtype: options.dtype || 'q8',    // Use q8 quantization for faster inference
+        dtype: options.dtype || 'fp32',    // Use fp32 for unquantized model as requested
       } as any);
 
       if (onProgress) onProgress('Ready');
@@ -42,31 +43,24 @@ export class InferenceService {
   }
 
   public async infer(imageBlob: Blob, numCandidates: number = 5): Promise<{ latex: string; candidates: string[]; debugImage: string }> {
-    console.log('[Inference] Starting infer, numCandidates:', numCandidates);
     if (!this.model || !this.tokenizer) {
-      console.log('[Inference] Model not loaded, initializing...');
       await this.init();
     }
 
     // 1. Preprocess
-    console.log('[Inference] Starting preprocessing...');
     const { tensor: pixelValues, debugImage } = await this.preprocess(imageBlob);
-    console.log('[Inference] Preprocessing complete, tensor shape:', pixelValues.dims);
 
     // 2. Fast path: if only 1 candidate needed, use simple greedy decoding
     if (numCandidates <= 1) {
-      console.log('[Inference] Using fast path (greedy decoding)...');
-      console.time('[Inference] generate');
       const outputTokenIds = await this.model!.generate({
         pixel_values: pixelValues,
-        max_new_tokens: 512,
+        max_new_tokens: 1024,
         do_sample: false,
         pad_token_id: this.tokenizer!.pad_token_id,
         eos_token_id: this.tokenizer!.eos_token_id,
         bos_token_id: this.tokenizer!.bos_token_id,
         decoder_start_token_id: this.tokenizer!.bos_token_id,
       } as any);
-      console.timeEnd('[Inference] generate');
 
       const generatedText = this.tokenizer!.decode(outputTokenIds[0], {
         skip_special_tokens: true,
@@ -80,62 +74,138 @@ export class InferenceService {
       };
     }
 
-    // 3. Multi-candidate generation using sampling for diversity
-    // Generate multiple sequences with temperature-based sampling
-    const candidates: string[] = [];
-    const seenOutputs = new Set<string>();
+    // 3. Multi-candidate: Custom beam search - step through decoder manually
+    const numBeams = numCandidates;
+    const maxTokens = 512;
+    const eosTokenId = this.tokenizer!.eos_token_id as number;
+    const bosTokenId = this.tokenizer!.bos_token_id as number;
+    const padTokenId = this.tokenizer!.pad_token_id as number;
+    const model = this.model as any;
 
-    // First, get the best greedy result
-    const greedyResult = await this.model!.generate({
-      pixel_values: pixelValues,
-      max_new_tokens: 512,
-      do_sample: false,
-      pad_token_id: this.tokenizer!.pad_token_id,
-      eos_token_id: this.tokenizer!.eos_token_id,
-      bos_token_id: this.tokenizer!.bos_token_id,
-      decoder_start_token_id: this.tokenizer!.bos_token_id,
-    } as any);
+    // Beam type
+    type Beam = { tokens: number[]; score: number; done: boolean };
+    let beams: Beam[] = [{ tokens: [bosTokenId], score: 0, done: false }];
+    let encoderOutputs: any = null;
 
-    const greedyText = this.tokenizer!.decode(greedyResult[0], { skip_special_tokens: true });
-    const greedyProcessed = this.postprocess(greedyText);
-    if (greedyProcessed) {
-      candidates.push(greedyProcessed);
-      seenOutputs.add(greedyProcessed);
-    }
+    // Step through generation token by token
+    for (let step = 0; step < maxTokens; step++) {
+      const allCandidates: Beam[] = [];
 
-    // Generate additional candidates using sampling with different temperatures
-    // This is faster than custom beam search because we can parallelize
-    const temperatures = [0.3, 0.5, 0.7, 0.9];
-    const remainingSlots = numCandidates - candidates.length;
-
-    for (let i = 0; i < remainingSlots && i < temperatures.length; i++) {
-      try {
-        const sampleResult = await this.model!.generate({
-          pixel_values: pixelValues,
-          max_new_tokens: 512,
-          do_sample: true,
-          temperature: temperatures[i],
-          top_k: 50,
-          top_p: 0.95,
-          pad_token_id: this.tokenizer!.pad_token_id,
-          eos_token_id: this.tokenizer!.eos_token_id,
-          bos_token_id: this.tokenizer!.bos_token_id,
-          decoder_start_token_id: this.tokenizer!.bos_token_id,
-        } as any);
-
-        const sampleText = this.tokenizer!.decode(sampleResult[0], { skip_special_tokens: true });
-        const sampleProcessed = this.postprocess(sampleText);
-
-        if (sampleProcessed && !seenOutputs.has(sampleProcessed)) {
-          candidates.push(sampleProcessed);
-          seenOutputs.add(sampleProcessed);
+      for (const beam of beams) {
+        if (beam.done) {
+          allCandidates.push(beam);
+          continue;
         }
-      } catch (error) {
-        console.warn('[Inference] Sampling failed for temperature', temperatures[i], error);
+
+        try {
+          // Create input tensor for this beam
+          const decoderInputIds = new Tensor(
+            'int64',
+            BigInt64Array.from(beam.tokens.map(t => BigInt(t))),
+            [1, beam.tokens.length]
+          );
+
+          // Try forward pass to get logits
+          let logitsData: Float32Array | null = null;
+
+          if (model.forward) {
+            const outputs = await model.forward({
+              pixel_values: pixelValues, // Always pass - ONNX doesn't cache encoder
+              decoder_input_ids: decoderInputIds,
+              use_cache: false,
+            });
+
+            const logits = outputs.logits || outputs.decoder_logits;
+            if (logits) {
+              // Get last token logits
+              const seqLen = beam.tokens.length;
+              const vocabSize = logits.dims[logits.dims.length - 1];
+              const startIdx = (seqLen - 1) * vocabSize;
+              logitsData = new Float32Array(logits.data.slice(startIdx, startIdx + vocabSize));
+            }
+          }
+
+          if (!logitsData) {
+            // Fallback: greedy generation
+            const result = await model.generate({
+              pixel_values: pixelValues,
+              max_new_tokens: 1,
+              do_sample: false,
+              pad_token_id: padTokenId,
+              eos_token_id: eosTokenId,
+              bos_token_id: bosTokenId,
+              decoder_start_token_id: bosTokenId,
+            });
+
+            const seqs = result.sequences || result;
+            const nextToken = Number(seqs.data[seqs.data.length - 1]);
+            allCandidates.push({
+              tokens: [...beam.tokens, nextToken],
+              score: beam.score,
+              done: nextToken === eosTokenId
+            });
+            continue;
+          }
+
+          // Compute log probabilities from logits
+          const maxLogit = Math.max(...logitsData);
+          const expSum = logitsData.reduce((sum, x) => sum + Math.exp(x - maxLogit), 0);
+          const logProbs = Array.from(logitsData).map(x => (x - maxLogit) - Math.log(expSum));
+
+          // Get top-k tokens
+          const topK = logProbs
+            .map((prob, idx) => ({ prob, idx }))
+            .sort((a, b) => b.prob - a.prob)
+            .slice(0, numBeams);
+
+          for (const { prob, idx } of topK) {
+            allCandidates.push({
+              tokens: [...beam.tokens, idx],
+              score: beam.score + prob,
+              done: idx === eosTokenId
+            });
+          }
+
+        } catch (error) {
+          console.error('[DEBUG] Beam step error:', error);
+          // On error, mark beam as done
+          allCandidates.push({ ...beam, done: true });
+        }
+      }
+
+      if (allCandidates.length === 0) break;
+
+      // Keep top beams
+      allCandidates.sort((a, b) => b.score - a.score);
+      beams = allCandidates.slice(0, numBeams);
+
+      // Check if all done
+      if (beams.every(b => b.done)) break;
+
+      // Debug progress
+      if (step % 20 === 0) {
+        console.log(`[DEBUG] Step ${step}, beams: ${beams.length}, best score: ${beams[0].score.toFixed(2)}`);
       }
     }
 
-    console.log(`[Inference] Generated ${candidates.length} candidates`);
+    // 3. Decode beams to candidates
+    const candidates: string[] = [];
+    beams.sort((a, b) => b.score - a.score);
+
+    for (const beam of beams) {
+      try {
+        const text = this.tokenizer!.decode(beam.tokens, { skip_special_tokens: true });
+        const processed = this.postprocess(text);
+        if (processed && !candidates.includes(processed)) {
+          candidates.push(processed);
+          console.log(`[DEBUG] Candidate ${candidates.length}:`, processed);
+        }
+      } catch (e) {
+        console.error('[DEBUG] Decode error:', e);
+      }
+    }
+
+    console.log(`[DEBUG] Generated ${candidates.length} candidates`);
 
     return {
       latex: candidates[0] || '',
@@ -181,10 +251,10 @@ export class InferenceService {
     ctx.putImageData(imageData, 0, 0);
 
     // 2. Trim white border
-    imageData = trimWhiteBorder(imageData);
+    imageData = this.trimWhiteBorder(imageData);
 
     // 3. Resize and Pad (Letterbox) to FIXED_IMG_SIZE
-    const processedCanvas = resizeAndPad(imageData, FIXED_IMG_SIZE);
+    const processedCanvas = this.resizeAndPad(imageData, FIXED_IMG_SIZE);
     const processedCtx = processedCanvas.getContext('2d');
     const processedData = processedCtx!.getImageData(0, 0, FIXED_IMG_SIZE, FIXED_IMG_SIZE);
 
@@ -228,7 +298,112 @@ export class InferenceService {
     };
   }
 
+  private trimWhiteBorder(imageData: ImageData): ImageData {
+    const { width, height, data } = imageData;
+    let minX = width, minY = height, maxX = 0, maxY = 0;
+    let found = false;
 
+    // Detect background color from corners (like Python implementation)
+    const getCornerColor = (x: number, y: number) => {
+      const idx = (y * width + x) * 4;
+      return [data[idx], data[idx + 1], data[idx + 2]];
+    };
+
+    const corners = [
+      getCornerColor(0, 0),           // top-left
+      getCornerColor(width - 1, 0),   // top-right
+      getCornerColor(0, height - 1),  // bottom-left
+      getCornerColor(width - 1, height - 1), // bottom-right
+    ];
+
+    // Find most common corner color as background
+    const bgColor = corners[0]; // Simple: just use top-left as bg color
+
+    // Use threshold of 15 (matching Python implementation)
+    const threshold = 15;
+
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const idx = (y * width + x) * 4;
+        const r = data[idx];
+        const g = data[idx + 1];
+        const b = data[idx + 2];
+
+        // Check if pixel differs from background by more than threshold
+        if (Math.abs(r - bgColor[0]) > threshold ||
+          Math.abs(g - bgColor[1]) > threshold ||
+          Math.abs(b - bgColor[2]) > threshold) {
+          if (x < minX) minX = x;
+          if (x > maxX) maxX = x;
+          if (y < minY) minY = y;
+          if (y > maxY) maxY = y;
+          found = true;
+        }
+      }
+    }
+
+    if (!found) return imageData; // Return original if empty
+
+    const w = maxX - minX + 1;
+    const h = maxY - minY + 1;
+
+    const canvas = document.createElement('canvas');
+    canvas.width = w;
+    canvas.height = h;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return imageData;
+
+    // Draw the cropped region
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const tempCtx = tempCanvas.getContext('2d');
+    if (!tempCtx) return imageData;
+    tempCtx.putImageData(imageData, 0, 0);
+
+    ctx.drawImage(tempCanvas, minX, minY, w, h, 0, 0, w, h);
+    return ctx.getImageData(0, 0, w, h);
+  }
+
+  private resizeAndPad(imageData: ImageData, targetSize: number): HTMLCanvasElement {
+    const { width, height } = imageData;
+
+    // Python logic: v2.Resize(size=447, max_size=448)
+    // scale1 = 447 / min(w, h)
+    // scale2 = 448 / max(w, h)
+    // scale = min(scale1, scale2)
+
+    const scale1 = (targetSize - 1) / Math.min(width, height);
+    const scale2 = targetSize / Math.max(width, height);
+    const scale = Math.min(scale1, scale2);
+
+    const newW = Math.round(width * scale);
+    const newH = Math.round(height * scale);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = targetSize;
+    canvas.height = targetSize;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Failed to get canvas context');
+
+    // Fill with white background
+    ctx.fillStyle = 'white';
+    ctx.fillRect(0, 0, targetSize, targetSize);
+
+    // Draw resized image at top-left (0, 0)
+    // This matches the Python implementation: padding=[0, 0, right, bottom]
+    const tempCanvas = document.createElement('canvas');
+    tempCanvas.width = width;
+    tempCanvas.height = height;
+    const tempCtx = tempCanvas.getContext('2d');
+    tempCtx!.putImageData(imageData, 0, 0);
+
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(tempCanvas, 0, 0, width, height, 0, 0, newW, newH);
+
+    return canvas;
+  }
 
   private postprocess(latex: string): string {
     // 1. Remove style (bold, italic, etc.) - optional but recommended for cleaner output
@@ -236,10 +411,6 @@ export class InferenceService {
 
     // 2. Add newlines for readability
     processed = addNewlines(processed);
-
-    // 3. Apply advanced formatting (indentation, wrapping)
-    // DISABLED: Formatter was removing \begin{split} environments
-    // processed = formatLatex(processed);
 
     return processed;
   }

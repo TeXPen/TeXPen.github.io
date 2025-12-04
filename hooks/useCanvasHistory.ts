@@ -14,7 +14,7 @@ export const useCanvasHistory = () => {
   }, []);
 
   const saveSnapshot = useCallback((canvas: HTMLCanvasElement) => {
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx) return;
 
     // Get raw image data
@@ -42,7 +42,7 @@ export const useCanvasHistory = () => {
     historyIndexRef.current--;
     const imageData = historyRef.current[historyIndexRef.current];
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx || !imageData) return;
 
     ctx.putImageData(imageData, 0, 0);
@@ -55,7 +55,7 @@ export const useCanvasHistory = () => {
     historyIndexRef.current++;
     const imageData = historyRef.current[historyIndexRef.current];
 
-    const ctx = canvas.getContext('2d');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     if (!ctx || !imageData) return;
 
     ctx.putImageData(imageData, 0, 0);

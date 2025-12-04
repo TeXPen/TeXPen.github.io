@@ -12,35 +12,63 @@ interface CanvasAreaProps {
 
 const CanvasArea: React.FC<CanvasAreaProps> = ({ theme, onStrokeEnd, onClear }) => {
     const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const contentCanvasRef = useRef<HTMLCanvasElement | null>(null);
     const [activeTool, setActiveTool] = useState<ToolType>('pen');
     const { saveSnapshot, undo, redo, clear: clearHistory, canUndo, canRedo } = useCanvasHistory();
 
     const handleStrokeEnd = useCallback(() => {
-        if (canvasRef.current) {
-            saveSnapshot(canvasRef.current);
-            onStrokeEnd(canvasRef.current);
+        if (contentCanvasRef.current) {
+            saveSnapshot(contentCanvasRef.current);
+            onStrokeEnd(contentCanvasRef.current);
         }
     }, [onStrokeEnd, saveSnapshot]);
 
     const handleClear = () => {
         const canvas = canvasRef.current;
         if (canvas) {
-            const ctx = canvas.getContext('2d');
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
             if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+        }
+        const contentCanvas = contentCanvasRef.current;
+        if (contentCanvas) {
+            const ctx = contentCanvas.getContext('2d', { willReadFrequently: true });
+            if (ctx) ctx.clearRect(0, 0, contentCanvas.width, contentCanvas.height);
         }
         clearHistory();
         onClear();
     };
 
     const handleUndo = useCallback(() => {
-        if (canvasRef.current) {
-            undo(canvasRef.current);
+        const canvas = canvasRef.current;
+        const contentCanvas = contentCanvasRef.current;
+        if (contentCanvas && canvas) {
+            undo(contentCanvas);
+            // Copy to visible
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            if (ctx) {
+                ctx.save();
+                ctx.resetTransform();
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(contentCanvas, 0, 0);
+                ctx.restore();
+            }
         }
     }, [undo]);
 
     const handleRedo = useCallback(() => {
-        if (canvasRef.current) {
-            redo(canvasRef.current);
+        const canvas = canvasRef.current;
+        const contentCanvas = contentCanvasRef.current;
+        if (contentCanvas && canvas) {
+            redo(contentCanvas);
+            // Copy to visible
+            const ctx = canvas.getContext('2d', { willReadFrequently: true });
+            if (ctx) {
+                ctx.save();
+                ctx.resetTransform();
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(contentCanvas, 0, 0);
+                ctx.restore();
+            }
         }
     }, [redo]);
 
@@ -60,6 +88,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({ theme, onStrokeEnd, onClear }) 
                 activeTool={activeTool}
                 onStrokeEnd={handleStrokeEnd}
                 refCallback={(ref) => canvasRef.current = ref}
+                contentRefCallback={(ref) => contentCanvasRef.current = ref}
             />
 
             {/* Clear Button */}

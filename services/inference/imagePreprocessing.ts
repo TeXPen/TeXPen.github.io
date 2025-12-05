@@ -19,41 +19,26 @@ export async function preprocess(imageBlob: Blob): Promise<{ tensor: Tensor; deb
 
   // 1.5 Handle Transparency & Theme: Force Black on White
   // The model expects Black text on White background.
-  // Our input might be:
-  //   a) From canvas: White/Black text on Transparent background
-  //   b) From file: Opaque image, already black text on white background
+  // Our input might be White text on Transparent (Dark Mode) or Black on Transparent (Light Mode).
+  // Always convert: transparent -> white, opaque -> black
   const pixelData = imageData.data;
-
-  // Detect if the image has any transparency
-  let hasTransparency = false;
   for (let i = 0; i < pixelData.length; i += 4) {
-    if (pixelData[i + 3] < 250) {
-      hasTransparency = true;
-      break;
+    const alpha = pixelData[i + 3];
+    if (alpha < 50) {
+      // Transparent -> White
+      pixelData[i] = 255;     // R
+      pixelData[i + 1] = 255; // G
+      pixelData[i + 2] = 255; // B
+      pixelData[i + 3] = 255; // Alpha
+    } else {
+      // Content -> Black
+      pixelData[i] = 0;       // R
+      pixelData[i + 1] = 0;   // G
+      pixelData[i + 2] = 0;   // B
+      pixelData[i + 3] = 255; // Alpha
     }
   }
-
-  if (hasTransparency) {
-    // Canvas input: Convert transparent -> white, content -> black
-    for (let i = 0; i < pixelData.length; i += 4) {
-      const alpha = pixelData[i + 3];
-      if (alpha < 50) {
-        // Transparent -> White
-        pixelData[i] = 255;     // R
-        pixelData[i + 1] = 255; // G
-        pixelData[i + 2] = 255; // B
-        pixelData[i + 3] = 255; // Alpha
-      } else {
-        // Content -> Black
-        pixelData[i] = 0;       // R
-        pixelData[i + 1] = 0;   // G
-        pixelData[i + 2] = 0;   // B
-        pixelData[i + 3] = 255; // Alpha
-      }
-    }
-    ctx.putImageData(imageData, 0, 0);
-  }
-  // For opaque images, we assume they're already black on white and don't modify
+  ctx.putImageData(imageData, 0, 0);
 
   // 2. Trim white border
   imageData = trimWhiteBorder(imageData);

@@ -1,3 +1,4 @@
 - [ ] fix light mode
 - [ ] fix inference
+    - [ ] if the user draws a new one, queue the inference, allow up to 3 seconds for previous one to finish, else skip to new
 - [ ] add image upload tab

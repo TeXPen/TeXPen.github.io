@@ -61,7 +61,7 @@ export async function beamSearch(
           outputs = await (model as any).forward({
             encoder_outputs: encoderOutputs,
             decoder_input_ids: decoderInputIds,
-            use_cache: false, // We could optimize this further with KV cache, but encoder is the big one
+            use_cache: true,
           });
 
           const logits = outputs.logits || outputs.decoder_logits;

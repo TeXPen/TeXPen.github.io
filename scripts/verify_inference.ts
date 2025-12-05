@@ -1,6 +1,6 @@
 
 import { JSDOM } from 'jsdom';
-import { inferenceService } from '../services/inferenceService';
+import { inferenceService } from '../services/inference/InferenceService';
 import fs from 'fs';
 import path from 'path';
 import { createCanvas, loadImage } from '@napi-rs/canvas';
@@ -48,7 +48,7 @@ async function runTest() {
 
   console.log('Initializing model...');
   // Use 'cpu' or 'wasm' for Node environment
-  await inferenceService.init((status) => console.log(status), { device: 'cpu', dtype: 'fp32' });
+  await inferenceService.init((status) => console.log(status), { device: 'wasm', dtype: 'fp32' });
 
   console.log('Running inference...');
   try {

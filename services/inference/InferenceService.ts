@@ -46,10 +46,36 @@ export class InferenceService {
 
       if (onProgress) onProgress(`Loading model with ${device} (${dtype})... (this may take a while)`);
 
-      this.model = await AutoModelForVision2Seq.from_pretrained(MODEL_ID, {
+      // Define file mappings based on dtype
+      // Note: We assume 'encoder_model.onnx' is used for fp16 if a specific fp16 encoder doesn't exist.
+      // The user provided links for:
+      // - decoder_with_past_model_fp16.onnx
+      // - encoder_model_int8.onnx
+      // - decoder_with_past_model_int8.onnx
+
+      let sessionOptions: any = {
         device: device,
         dtype: dtype,
-      } as any);
+      };
+
+      if (dtype === 'fp16') {
+        sessionOptions = {
+          ...sessionOptions,
+          // For fp16, we use the default encoder (usually fp32 or mixed) if fp16 encoder isn't available,
+          // and the specific fp16 decoder.
+          encoder_model_file_name: 'encoder_model.onnx',
+          decoder_model_file_name: 'decoder_with_past_model_fp16.onnx',
+        };
+      } else if (dtype === 'q8') {
+        sessionOptions = {
+          ...sessionOptions,
+          encoder_model_file_name: 'encoder_model_int8.onnx',
+          decoder_model_file_name: 'decoder_with_past_model_int8.onnx',
+        };
+      }
+      // For fp32 (default), we rely on standard naming or explicit defaults if needed.
+
+      this.model = await AutoModelForVision2Seq.from_pretrained(MODEL_ID, sessionOptions);
 
       if (onProgress) onProgress('Ready');
     } catch (error) {

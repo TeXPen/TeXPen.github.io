@@ -14,6 +14,8 @@ const Header: React.FC = () => {
         setQuantization,
         provider,
         setProvider,
+        showVisualDebugger,
+        setShowVisualDebugger,
     } = useAppContext();
     const { theme, toggleTheme } = useThemeContext();
 
@@ -129,6 +131,20 @@ const Header: React.FC = () => {
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
                         </svg>
                     )}
+                </button>
+
+                {/* Debug Toggle */}
+                <button
+                    onClick={() => setShowVisualDebugger(!showVisualDebugger)}
+                    className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all shadow-sm ${showVisualDebugger
+                            ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-600 dark:text-cyan-400'
+                            : 'bg-black/5 dark:bg-white/5 border-black/5 dark:border-white/5 text-slate-500 dark:text-white/40 hover:text-cyan-500 dark:hover:text-cyan-400 hover:bg-black/10 dark:hover:bg-white/10'
+                        }`}
+                    title={showVisualDebugger ? "Hide Visual Debugger" : "Show Visual Debugger"}
+                >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    </svg>
                 </button>
 
             </div>

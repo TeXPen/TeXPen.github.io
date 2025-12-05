@@ -67,9 +67,8 @@ export async function preprocess(imageBlob: Blob): Promise<{ tensor: Tensor; deb
   // transformers.js expects [batch_size, channels, height, width]
   // We need to flatten it to [1, 1, 448, 448] (grayscale)
 
-  // DEBUG: Log the preprocessed image
-  const debugImage = canvas.toDataURL();
-  // console.log('[DEBUG] Preprocessed Input Image:', debugImage);
+  // DEBUG: Log the preprocessed image (use processedCanvas, not original canvas)
+  const debugImage = processedCanvas.toDataURL();
 
   const float32Data = new Float32Array(FIXED_IMG_SIZE * FIXED_IMG_SIZE);
   const { data } = processedData;

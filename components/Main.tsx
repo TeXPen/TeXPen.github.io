@@ -9,6 +9,7 @@ import OutputDisplay from './OutputDisplay';
 import Candidates from './Candidates';
 import CanvasArea from './CanvasArea';
 import LoadingOverlay from './LoadingOverlay';
+import VisualDebugger from './VisualDebugger';
 
 const Main: React.FC = () => {
     const {
@@ -27,6 +28,8 @@ const Main: React.FC = () => {
         selectedIndex,
         selectCandidate,
         isInferencing,
+        debugImage,
+        showVisualDebugger,
     } = useAppContext();
 
     const { theme } = useThemeContext();
@@ -77,7 +80,8 @@ const Main: React.FC = () => {
                 </div>
             </div>
 
-            {/* <VisualDebugger debugImage={debugImage} /> */}
+            {/* Visual Debugger (shows preprocessed image when enabled) */}
+            {showVisualDebugger && <VisualDebugger debugImage={debugImage} />}
 
             {/* Full overlay only for initial model loading or errors */}
             {showFullOverlay && (

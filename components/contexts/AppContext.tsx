@@ -30,6 +30,8 @@ interface AppContextType {
     userConfirmed: boolean;
     setUserConfirmed: (confirmed: boolean) => void;
     isLoadedFromCache: boolean;
+    showVisualDebugger: boolean;
+    setShowVisualDebugger: (show: boolean) => void;
 
     // Sidebar
     isSidebarOpen: boolean;
@@ -82,6 +84,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     const [selectedIndex, setSelectedIndex] = useState<number>(0);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [showVisualDebugger, setShowVisualDebugger] = useState(false);
 
     const loadFromHistory = (item: HistoryItem) => {
         setLatex(item.latex);
@@ -121,6 +124,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         userConfirmed,
         setUserConfirmed,
         isLoadedFromCache,
+        showVisualDebugger,
+        setShowVisualDebugger,
 
         // Sidebar
         isSidebarOpen,

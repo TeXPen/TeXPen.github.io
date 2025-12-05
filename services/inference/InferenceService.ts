@@ -22,7 +22,7 @@ export class InferenceService {
     return InferenceService.instance;
   }
 
-  public async init(onProgress?: (status: string) => void, options: { dtype?: string, device?: 'webgpu' | 'wasm' | 'webgl' } = {}): Promise<void> {
+  public async init(onProgress?: (status: string, progress?: number) => void, options: { dtype?: string, device?: 'webgpu' | 'wasm' | 'webgl' } = {}): Promise<void> {
     if (this.model && this.tokenizer) {
       // If the model is already loaded, but the quantization or device is different, we need to dispose and reload.
       if ((options.dtype && (this.model as any).config.dtype !== options.dtype) ||

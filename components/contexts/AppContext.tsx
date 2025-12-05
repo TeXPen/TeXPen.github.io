@@ -26,6 +26,10 @@ interface AppContextType {
     setQuantization: (q: string) => void;
     provider: Provider;
     setProvider: (p: Provider) => void;
+    progress: number;
+    userConfirmed: boolean;
+    setUserConfirmed: (confirmed: boolean) => void;
+    isLoadedFromCache: boolean;
 
     // Sidebar
     isSidebarOpen: boolean;
@@ -70,6 +74,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         debugImage,
         numCandidates,
         setNumCandidates,
+        progress,
+        userConfirmed,
+        setUserConfirmed,
+        isLoadedFromCache,
     } = useInkModel(theme, quantization, provider);
 
     const [selectedIndex, setSelectedIndex] = useState<number>(0);
@@ -109,6 +117,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setQuantization,
         provider,
         setProvider,
+        progress,
+        userConfirmed,
+        setUserConfirmed,
+        isLoadedFromCache,
 
         // Sidebar
         isSidebarOpen,

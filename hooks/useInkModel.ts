@@ -27,6 +27,28 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string, provi
   const [isInferencing, setIsInferencing] = useState<boolean>(false);
   const [loadingPhase, setLoadingPhase] = useState<string>('');
   const [debugImage, setDebugImage] = useState<string | null>(null);
+  const [progress, setProgress] = useState(0);
+  const [userConfirmed, setUserConfirmed] = useState(false);
+  const [isLoadedFromCache, setIsLoadedFromCache] = useState(false);
+
+  // Check if the model is cached
+  useEffect(() => {
+    async function checkCache() {
+      try {
+        const cache = await caches.open('transformers-cache');
+        const requests = await cache.keys();
+        const isCached = requests.some(req => req.url.includes(config.encoderModelUrl));
+        setIsLoadedFromCache(isCached);
+        // If it's cached, we don't need user confirmation to start downloading
+        if (isCached) {
+          setUserConfirmed(true);
+        }
+      } catch (error) {
+        console.warn('Cache API is not available or failed:', error);
+      }
+    }
+    checkCache();
+  }, [config.encoderModelUrl]);
 
   // Initialize model on mount
   useEffect(() => {
@@ -34,7 +56,12 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string, provi
       try {
         setStatus('loading');
         setLoadingPhase('Initializing model...');
-        await inferenceService.init((phase) => setLoadingPhase(phase), { dtype: quantization, device: provider });
+        await inferenceService.init((phase, progress) => {
+          setLoadingPhase(phase);
+          if (progress !== undefined) {
+            setProgress(progress);
+          }
+        }, { dtype: quantization, device: provider });
         setStatus('idle');
         setLoadingPhase('');
       } catch (error) {
@@ -43,8 +70,10 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string, provi
         setLoadingPhase('Failed to load model');
       }
     };
-    initModel();
-  }, [quantization, provider]);
+    if (userConfirmed) {
+      initModel();
+    }
+  }, [quantization, provider, userConfirmed]);
 
   const infer = useCallback(async (canvas: HTMLCanvasElement) => {
     setIsInferencing(true);
@@ -139,5 +168,9 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string, provi
     debugImage,
     numCandidates,
     setNumCandidates,
+    progress,
+    userConfirmed,
+    setUserConfirmed,
+    isLoadedFromCache,
   };
 }

@@ -1,4 +1,4 @@
-import cv from "opencv.js";
+import cv from "@techstark/opencv-js";
 import { Tensor } from "onnxruntime-web";
 
 const FIXED_IMG_SIZE = 224;

@@ -4,12 +4,22 @@ import { useAppContext } from './contexts/AppContext';
 const LoadingOverlay: React.FC = () => {
     const {
         status,
+        loadingPhase,
+        progress,
+        userConfirmed,
+        setUserConfirmed,
+        isLoadedFromCache,
     } = useAppContext();
 
-    const error = status === 'error' ? 'Failed to get LaTeX from server. Please ensure the TexTeller server is running and accessible. Refer to services/tex-teller/README.md for instructions.' : undefined;
+    const error = status === 'error' ? 'Failed to load models. Please check your internet connection and try again.' : undefined;
+    const needsConfirmation = !userConfirmed && !isLoadedFromCache;
+    const onConfirm = () => setUserConfirmed(true);
 
-    // Only show overlay if loading or error
-    if (status !== 'loading' && status !== 'error') {
+    // Only show full overlay for initial model loading, not during inference
+    const isInitialLoading = status === 'loading' && loadingPhase.includes('model');
+    const showFullOverlay = isInitialLoading || status === 'error';
+
+    if (!showFullOverlay) {
         return null;
     }
 
@@ -33,6 +43,23 @@ const LoadingOverlay: React.FC = () => {
                                 Retry
                             </button>
                         </>
+                    ) : needsConfirmation ? (
+                        <>
+                            <div className="text-6xl mb-4">⏳</div>
+                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                                Confirm Model Download
+                            </h2>
+                            <p className="text-gray-600 dark:text-gray-400 mb-4 text-sm">
+                                The AI model will be downloaded to your browser's cache (approx 30MB).
+                                This will only happen once.
+                            </p>
+                            <button
+                                onClick={onConfirm}
+                                className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg transition-colors"
+                            >
+                                Start Download
+                            </button>
+                        </>
                     ) : (
                         <>
                             <div className="text-6xl mb-4 animate-pulse">🧠</div>
@@ -40,8 +67,13 @@ const LoadingOverlay: React.FC = () => {
                                 Loading AI Model
                             </h2>
                             <p className="text-gray-500 dark:text-gray-500 text-xs mt-2">
-                                Loading models...
+                                {loadingPhase} {progress > 0 && `(${Math.round(progress)}%)`}
                             </p>
+                            {isLoadedFromCache && (
+                                <p className="text-gray-500 dark:text-gray-500 text-xs mt-1">
+                                    (Loaded from cache)
+                                </p>
+                            )}
                         </>
                     )}
                 </div>

@@ -61,12 +61,7 @@ const Main: React.FC = () => {
                     <div className="flex-1 flex flex-col min-w-0 z-10 relative">
                         <OutputDisplay latex={latex} isInferencing={isInferencing} />
 
-                        <Candidates
-                            candidates={candidates}
-                            selectedIndex={selectedIndex}
-                            onSelect={selectCandidate}
-                            status={status}
-                        />
+                        <Candidates />
 
                         <CanvasArea
                             theme={theme}
@@ -86,14 +81,7 @@ const Main: React.FC = () => {
 
             {/* Full overlay only for initial model loading or errors */}
             {showFullOverlay && (
-                <LoadingOverlay
-                    phase={loadingPhase}
-                    progress={progress}
-                    error={status === 'error' ? 'Failed to load models. Please check your internet connection and try again.' : undefined}
-                    needsConfirmation={!userConfirmed}
-                    onConfirm={() => setUserConfirmed(true)}
-                    isLoadedFromCache={isLoadedFromCache}
-                />
+                <LoadingOverlay />
             )}
         </div>
     );

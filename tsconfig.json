@@ -11,7 +11,8 @@
     ],
     "skipLibCheck": true,
     "types": [
-      "node"
+      "node",
+      "@webgpu/types"
     ],
     "moduleResolution": "bundler",
     "isolatedModules": true,

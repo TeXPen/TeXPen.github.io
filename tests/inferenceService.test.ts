@@ -100,6 +100,17 @@ describe('InferenceService', () => {
     expect(result.candidates[0]).toBe('candidate 1');
   });
 
+  it('should prevent double initialization', async () => {
+    // Call init twice in parallel
+    const p1 = service.init();
+    const p2 = service.init();
+
+    // We check that the underlying logic was only executed once
+    await Promise.all([p1, p2]);
+    expect(mockFromPretrainedModel).toHaveBeenCalledTimes(1);
+    expect(mockFromPretrainedTokenizer).toHaveBeenCalledTimes(1);
+  });
+
   it('should throw error if already inferring', async () => {
     const mockBlob = new Blob([''], { type: 'image/png' });
 
@@ -112,5 +123,15 @@ describe('InferenceService', () => {
     const p1 = service.infer(mockBlob, 1);
     await expect(service.infer(mockBlob, 1)).rejects.toThrow("Another inference is already in progress");
     await p1;
+  });
+
+  it('should force dispose even if inferring', async () => {
+    // Simulate inferring
+    (service as any).isInferring = true;
+
+    // Should not throw
+    await service.dispose(true);
+
+    expect((service as any).isInferring).toBe(false);
   });
 });

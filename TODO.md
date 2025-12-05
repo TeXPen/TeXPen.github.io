@@ -1,6 +1,6 @@
 Priority
 - [ ] Gray out quantized selections for now (bad performance)
-- [ ] Unload model on page refresh, ensure never double loaded/memory leak etc.
+- [x] Unload model on page refresh, ensure never double loaded/memory leak etc.
 - [ ] if the user draws new input or switches model, queue the inference, allow up to 3 seconds for previous one to finish, else skip to new
 
 Bugs

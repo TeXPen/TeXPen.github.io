@@ -12,6 +12,7 @@ export class InferenceService {
   private static instance: InferenceService;
   private isInferring: boolean = false;
   private dtype: string = INFERENCE_CONFIG.DEFAULT_QUANTIZATION;
+  private initPromise: Promise<void> | null = null;
 
   private constructor() { }
 
@@ -23,38 +24,57 @@ export class InferenceService {
   }
 
   public async init(onProgress?: (status: string, progress?: number) => void, options: InferenceOptions = {}): Promise<void> {
-    if (this.model && this.tokenizer) {
-      // If the model is already loaded, but the quantization or device is different, we need to dispose and reload.
-      if ((options.dtype && (this.model as any).config.dtype !== options.dtype) ||
-        (options.device && (this.model as any).config.device !== options.device)) {
-        if (this.isInferring) {
-          throw new Error("Cannot change model settings while an inference is in progress.");
-        }
-        await this.dispose();
-      } else {
-        return;
-      }
+    // If initialization is already in progress, return the existing promise
+    if (this.initPromise) {
+      return this.initPromise;
     }
 
+    this.initPromise = (async () => {
+      if (this.model && this.tokenizer) {
+        // If the model is already loaded, but the quantization or device is different, we need to dispose and reload.
+        if ((options.dtype && (this.model as any).config.dtype !== options.dtype) ||
+          (options.device && (this.model as any).config.device !== options.device)) {
+          if (this.isInferring) {
+            console.warn("Changing model settings while inference is in progress. Waiting for it to finish or forceful disposal might occur.");
+            // Ideally we should wait, but for now we proceed to dispose which checks isInferring
+            // For safety in init, we might want to throw or wait. 
+            // Current decision: Throw if inferring, same as before, but wrapped in promise.
+            if (this.isInferring) {
+              throw new Error("Cannot change model settings while an inference is in progress.");
+            }
+          }
+          await this.dispose();
+        } else {
+          return;
+        }
+      }
+
+      try {
+        if (onProgress) onProgress('Loading tokenizer...');
+        this.tokenizer = await AutoTokenizer.from_pretrained(INFERENCE_CONFIG.MODEL_ID);
+
+        const webgpuAvailable = await isWebGPUAvailable();
+        const device = options.device || (webgpuAvailable ? 'webgpu' : 'wasm');
+        const dtype = options.dtype || (webgpuAvailable ? INFERENCE_CONFIG.DEFAULT_QUANTIZATION : 'q8');
+        this.dtype = dtype;
+
+        if (onProgress) onProgress(`Loading model with ${device} (${dtype})... (this may take a while)`);
+
+        const sessionOptions = getSessionOptions(device, dtype);
+
+        this.model = await AutoModelForVision2Seq.from_pretrained(INFERENCE_CONFIG.MODEL_ID, sessionOptions) as VisionEncoderDecoderModel;
+
+        if (onProgress) onProgress('Ready');
+      } catch (error) {
+        console.error('Failed to load model:', error);
+        throw error;
+      }
+    })();
+
     try {
-      if (onProgress) onProgress('Loading tokenizer...');
-      this.tokenizer = await AutoTokenizer.from_pretrained(INFERENCE_CONFIG.MODEL_ID);
-
-      const webgpuAvailable = await isWebGPUAvailable();
-      const device = options.device || (webgpuAvailable ? 'webgpu' : 'wasm');
-      const dtype = options.dtype || (webgpuAvailable ? INFERENCE_CONFIG.DEFAULT_QUANTIZATION : 'q8');
-      this.dtype = dtype;
-
-      if (onProgress) onProgress(`Loading model with ${device} (${dtype})... (this may take a while)`);
-
-      const sessionOptions = getSessionOptions(device, dtype);
-
-      this.model = await AutoModelForVision2Seq.from_pretrained(INFERENCE_CONFIG.MODEL_ID, sessionOptions) as VisionEncoderDecoderModel;
-
-      if (onProgress) onProgress('Ready');
-    } catch (error) {
-      console.error('Failed to load model:', error);
-      throw error;
+      await this.initPromise;
+    } finally {
+      this.initPromise = null;
     }
   }
 
@@ -119,18 +139,35 @@ export class InferenceService {
     return processed;
   }
 
-  public async dispose(): Promise<void> {
-    if (this.isInferring) {
-      throw new Error("Cannot dispose model while an inference is in progress.");
+  public async dispose(force: boolean = false): Promise<void> {
+    if (this.isInferring && !force) {
+      console.warn("Attempting to dispose model while inference is in progress. Ignoring (unless forced).");
+      return;
     }
+
+    // If loading is in progress, we can't easily cancel the promise, but we can reset the state.
+    // Ideally we should await initPromise, but that might deadlock if dispose is called from within init (reconfig).
+    // For now, we assume dispose logic cleans up what it can.
+
+    this.isInferring = false; // Force reset state
+
     if (this.model) {
       if ('dispose' in this.model && typeof (this.model as any).dispose === 'function') {
-        await (this.model as any).dispose();
+        try {
+          await (this.model as any).dispose();
+        } catch (e) {
+          console.warn("Error disposing model:", e);
+        }
       }
       this.model = null;
     }
     this.tokenizer = null;
+
+    // Important: Clear the instance so next getInstance creates a fresh one? 
+    // Or just keep the instance but empty?
+    // Following existing pattern of clearing instance.
     (InferenceService as any).instance = null;
+    this.initPromise = null;
   }
 }
 

@@ -1,4 +1,4 @@
+- [ ] fix inference hanging for quantized models
 - [ ] fix light mode
-- [ ] fix inference
-    - [ ] if the user draws a new one, queue the inference, allow up to 3 seconds for previous one to finish, else skip to new
+- [ ] if the user draws new input or switches model, queue the inference, allow up to 3 seconds for previous one to finish, else skip to new
 - [ ] add image upload tab

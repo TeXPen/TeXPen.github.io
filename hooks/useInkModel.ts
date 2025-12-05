@@ -50,30 +50,64 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string, provi
     checkCache();
   }, [config.encoderModelUrl]);
 
-  // Initialize model on mount
+  // Initialize model on mount, dispose on unmount or settings change
   useEffect(() => {
+    let isCancelled = false;
+
     const initModel = async () => {
       try {
         setStatus('loading');
         setLoadingPhase('Initializing model...');
         await inferenceService.init((phase, progress) => {
+          if (isCancelled) return; // Don't update state if cancelled
           setLoadingPhase(phase);
           if (progress !== undefined) {
             setProgress(progress);
           }
         }, { dtype: quantization, device: provider });
-        setStatus('idle');
-        setLoadingPhase('');
+
+        if (!isCancelled) {
+          setStatus('idle');
+          setLoadingPhase('');
+        }
       } catch (error) {
+        if (isCancelled) return; // Ignore errors if cancelled
         console.error('Failed to initialize model:', error);
         setStatus('error');
         setLoadingPhase('Failed to load model');
       }
     };
+
     if (userConfirmed) {
       initModel();
     }
+
+    // Cleanup: dispose model when settings change or component unmounts
+    return () => {
+      isCancelled = true;
+      // Only dispose if we were confirmed (model was potentially loaded)
+      if (userConfirmed) {
+        inferenceService.dispose().catch((err) => {
+          // Ignore disposal errors (e.g., if inference is in progress)
+          console.warn('Model disposal during cleanup:', err.message);
+        });
+      }
+    };
   }, [quantization, provider, userConfirmed]);
+
+  // Cleanup on page unload (refresh/close)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Attempt to dispose model before page unloads
+      // Note: async operations may not complete, but we try
+      inferenceService.dispose().catch(() => { });
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
 
   const infer = useCallback(async (canvas: HTMLCanvasElement) => {
     setIsInferencing(true);

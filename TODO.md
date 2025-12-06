@@ -1,7 +1,6 @@
 Priority
 
 Bugs
-- [ ] fix light mode
 
 Behavior
 

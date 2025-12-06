@@ -1,5 +1,8 @@
 @import "tailwindcss";
 
+/* Configure dark mode to use .dark class selector (Tailwind CSS v4) */
+@custom-variant dark (&:is(.dark *));
+
 @theme {
     --font-sans: "Space Grotesk", sans-serif;
     --font-mono: "JetBrains Mono", monospace;

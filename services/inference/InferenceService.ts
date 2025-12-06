@@ -54,15 +54,38 @@ export class InferenceService {
         this.tokenizer = await AutoTokenizer.from_pretrained(INFERENCE_CONFIG.MODEL_ID);
 
         const webgpuAvailable = await isWebGPUAvailable();
-        const device = options.device || (webgpuAvailable ? 'webgpu' : 'wasm');
-        const dtype = options.dtype || (webgpuAvailable ? INFERENCE_CONFIG.DEFAULT_QUANTIZATION : 'q8');
+        let device = options.device || (webgpuAvailable ? 'webgpu' : 'wasm');
+        let dtype = options.dtype || (webgpuAvailable ? INFERENCE_CONFIG.DEFAULT_QUANTIZATION : 'q8');
         this.dtype = dtype;
 
-        if (onProgress) onProgress(`Loading model with ${device} (${dtype})... (this may take a while)`);
+        if (onProgress) onProgress(`Loading model with ${device} (${dtype})...`);
 
         const sessionOptions = getSessionOptions(device, dtype);
 
-        this.model = await AutoModelForVision2Seq.from_pretrained(INFERENCE_CONFIG.MODEL_ID, sessionOptions) as VisionEncoderDecoderModel;
+        try {
+          this.model = await AutoModelForVision2Seq.from_pretrained(INFERENCE_CONFIG.MODEL_ID, sessionOptions) as VisionEncoderDecoderModel;
+        } catch (loadError: any) {
+          // Check if this is a WebGPU buffer size / memory error
+          const isWebGPUMemoryError = loadError?.message?.includes('createBuffer') ||
+            loadError?.message?.includes('mappedAtCreation') ||
+            loadError?.message?.includes('too large for the implementation') ||
+            loadError?.message?.includes('GPUDevice');
+
+          if (isWebGPUMemoryError && device === 'webgpu') {
+            console.warn('[InferenceService] WebGPU buffer allocation failed, falling back to WASM...');
+            if (onProgress) onProgress('WebGPU memory limit hit. Switching to WASM...');
+
+            // Retry with WASM
+            device = 'wasm';
+            dtype = 'q8'; // Use quantized for WASM performance
+            this.dtype = dtype;
+
+            const fallbackSessionOptions = getSessionOptions(device, dtype);
+            this.model = await AutoModelForVision2Seq.from_pretrained(INFERENCE_CONFIG.MODEL_ID, fallbackSessionOptions) as VisionEncoderDecoderModel;
+          } else {
+            throw loadError;
+          }
+        }
 
         if (onProgress) onProgress('Ready');
       } catch (error) {

@@ -52,24 +52,35 @@ const Header: React.FC = () => {
             {/* Right: Controls */}
             <div className="flex items-center gap-4">
 
-                {/* Tab Switcher */}
-                <div className="hidden md:flex items-center p-1 bg-black/5 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/5">
+                {/* Tab Switcher - Major Mode Toggle */}
+                <div className="hidden md:flex items-center p-1.5 bg-black/5 dark:bg-white/5 rounded-2xl border border-black/10 dark:border-white/10 shadow-inner">
                     <button
                         onClick={() => setActiveTab('draw')}
-                        className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${activeTab === 'draw'
-                            ? 'bg-white dark:bg-white/10 text-slate-800 dark:text-white shadow-sm'
-                            : 'text-slate-400 dark:text-white/40 hover:text-slate-600 dark:hover:text-white/80'
+                        className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition-all duration-200 ${activeTab === 'draw'
+                            ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/25'
+                            : 'text-slate-500 dark:text-white/40 hover:text-slate-700 dark:hover:text-white/80 hover:bg-black/5 dark:hover:bg-white/5'
                             }`}
                     >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M12 19l7-7 3 3-7 7-3-3z" />
+                            <path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z" />
+                            <path d="M2 2l7.586 7.586" />
+                            <circle cx="11" cy="11" r="2" />
+                        </svg>
                         Draw
                     </button>
                     <button
                         onClick={() => setActiveTab('upload')}
-                        className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${activeTab === 'upload'
-                            ? 'bg-white dark:bg-white/10 text-slate-800 dark:text-white shadow-sm'
-                            : 'text-slate-400 dark:text-white/40 hover:text-slate-600 dark:hover:text-white/80'
+                        className={`flex items-center gap-2 px-4 py-2 text-sm font-bold rounded-xl transition-all duration-200 ${activeTab === 'upload'
+                            ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg shadow-cyan-500/25'
+                            : 'text-slate-500 dark:text-white/40 hover:text-slate-700 dark:hover:text-white/80 hover:bg-black/5 dark:hover:bg-white/5'
                             }`}
                     >
+                        <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                            <polyline points="17 8 12 3 7 8" />
+                            <line x1="12" y1="3" x2="12" y2="15" />
+                        </svg>
                         Upload
                     </button>
                 </div>

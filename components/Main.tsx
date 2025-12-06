@@ -111,6 +111,30 @@ const Main: React.FC = () => {
                                     onStrokeEnd={handleInference}
                                     onClear={clearModel}
                                 />
+
+                                {/* Canvas loading overlay - blocks interaction while model loads */}
+                                {status === 'loading' && userConfirmed && (
+                                    <div className="absolute inset-0 z-20 flex flex-col">
+                                        {/* Subtle frosted overlay - just dims the canvas */}
+                                        <div className="flex-1 bg-black/20 dark:bg-black/40 backdrop-blur-[2px]" />
+
+                                        {/* Bottom bar with loading status */}
+                                        <div className="flex-none px-6 py-4 bg-white/95 dark:bg-[#111]/95 backdrop-blur-md border-t border-black/5 dark:border-white/5 flex items-center justify-between gap-4">
+                                            <div className="flex items-center gap-3">
+                                                <div className="relative w-5 h-5">
+                                                    <div className="absolute inset-0 border-2 border-cyan-500/30 rounded-full"></div>
+                                                    <div className="absolute inset-0 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+                                                </div>
+                                                <span className="text-sm font-medium text-slate-700 dark:text-white/80">
+                                                    {loadingPhase} {progress > 0 && `(${Math.round(progress)}%)`}
+                                                </span>
+                                            </div>
+                                            <span className="text-xs text-slate-400 dark:text-white/40">
+                                                You can switch to Upload tab while waiting
+                                            </span>
+                                        </div>
+                                    </div>
+                                )}
                             </div>
 
                             {/* Upload Area */}
@@ -138,16 +162,7 @@ const Main: React.FC = () => {
                 <LoadingOverlay />
             )}
 
-            {/* Non-blocking loading indicator (Optional, if we want a toast or corner indicator) */}
-            {status === 'loading' && userConfirmed && (
-                <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 bg-black/80 text-white rounded-full text-sm font-mono flex items-center gap-2 z-50 pointer-events-none animate-in slide-in-from-bottom-4">
-                    <svg className="animate-spin h-3 w-3 text-cyan-400" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    {loadingPhase} {progress > 0 && `(${Math.round(progress)}%)`}
-                </div>
-            )}
+
         </div>
     );
 };

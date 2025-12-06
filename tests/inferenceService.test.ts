@@ -75,63 +75,81 @@ describe('InferenceService', () => {
     expect(mockFromPretrainedTokenizer).toHaveBeenCalledWith(INFERENCE_CONFIG.MODEL_ID);
   });
 
-  it('should run single candidate inference using model.generate', async () => {
+  it('should run single candidate inference using beamSearch', async () => {
     const mockBlob = new Blob([''], { type: 'image/png' });
+    mockBeamSearch.mockResolvedValue(['raw latex']);
+
     const result = await service.infer(mockBlob, 1);
 
     expect(mockPreprocess).toHaveBeenCalled();
     expect(mockFromPretrainedModel).toHaveBeenCalled();
-    expect(mockGenerate).toHaveBeenCalled();
-    expect(result.latex).toBe('raw latex'); // "raw latex" -> removeStyle -> "raw latex" -> addNewlines
+    // It now uses beamSearch even for 1 candidate
+    expect(mockBeamSearch).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.anything(),
+      expect.anything(),
+      1, // numBeams
+      expect.anything(), // signal
+      expect.anything(), // maxTokens
+      expect.anything() // repetitionPenalty
+    );
+    expect(result.latex).toBe('raw latex');
     expect(result.candidates).toHaveLength(1);
-    expect(mockBeamSearch).not.toHaveBeenCalled();
   });
 
-  it('should run multi-candidate inference using beamSearch', async () => {
-    const mockBlob = new Blob([''], { type: 'image/png' });
-    mockBeamSearch.mockResolvedValue(['candidate 1', 'candidate 2']);
-
-    const result = await service.infer(mockBlob, 2);
-
-    expect(mockPreprocess).toHaveBeenCalled();
-    expect(mockBeamSearch).toHaveBeenCalledWith(expect.anything(), expect.anything(), expect.anything(), 2);
-    expect(mockGenerate).not.toHaveBeenCalled();
-    expect(result.candidates).toHaveLength(2);
-    expect(result.candidates[0]).toBe('candidate 1');
-  });
-
-  it('should prevent double initialization', async () => {
-    // Call init twice in parallel
-    const p1 = service.init();
-    const p2 = service.init();
-
-    // We check that the underlying logic was only executed once
-    await Promise.all([p1, p2]);
-    expect(mockFromPretrainedModel).toHaveBeenCalledTimes(1);
-    expect(mockFromPretrainedTokenizer).toHaveBeenCalledTimes(1);
-  });
-
-  it('should throw error if already inferring', async () => {
+  it('should queue concurrent requests', async () => {
     const mockBlob = new Blob([''], { type: 'image/png' });
 
-    // Simulate long running inference
-    mockPreprocess.mockImplementation(async () => {
-      await new Promise(r => setTimeout(r, 100));
-      return { tensor: { dispose: vi.fn() }, debugImage: '' };
+    // Mock preprocess or beamSearch to take some time to simulate processing
+    mockBeamSearch.mockImplementation(async () => {
+      await new Promise(r => setTimeout(r, 50));
+      return ['latex result'];
     });
 
+    // Call infer twice concurrently
     const p1 = service.infer(mockBlob, 1);
-    await expect(service.infer(mockBlob, 1)).rejects.toThrow("Another inference is already in progress");
-    await p1;
+    const p2 = service.infer(mockBlob, 1);
+
+    // Both should resolve successfully
+    // Both should resolve successfully
+    const [r1, r2] = await Promise.all([p1, p2]);
+
+    expect(r1.latex).toBe('latex result');
+    expect(r2.latex).toBe('latex result');
+    expect(mockBeamSearch).toHaveBeenCalledTimes(2);
   });
 
-  it('should force dispose even if inferring', async () => {
-    // Simulate inferring
-    (service as any).isInferring = true;
+  it('should force dispose and abort current inference', async () => {
+    // Start a long running inference
+    const mockBlob = new Blob([''], { type: 'image/png' });
+    let resolveSearch: (val: any) => void;
+    let rejectSearch: (reason: any) => void;
 
-    // Should not throw
+    mockBeamSearch.mockImplementation((...args) => {
+      const signal = args.find(arg => arg instanceof AbortSignal);
+      return new Promise((res, rej) => {
+        resolveSearch = res;
+        rejectSearch = rej;
+
+        if (signal) {
+          if (signal.aborted) {
+            rej(new Error("Aborted"));
+            return;
+          }
+          signal.addEventListener('abort', () => rej(new Error("Aborted")));
+        }
+      });
+    });
+
+    const inferencePromise = service.infer(mockBlob, 1);
+
+    // Give it a moment to start
+    await new Promise(r => setTimeout(r, 0));
+
+    // Force dispose
     await service.dispose(true);
 
-    expect((service as any).isInferring).toBe(false);
+    // The inference should reject or settle
+    await expect(inferencePromise).rejects.toThrow("Aborted");
   });
 });

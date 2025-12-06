@@ -1,0 +1,230 @@
+
+> inktex@0.0.0 test
+> vitest run tests/imageUploadArea.test.tsx
+
+
+[1m[46m RUN [49m[22m [36mv4.0.15 [39m[90mD:/GitHub/TeXFlow/InkTex[39m
+
+ [31mΓ¥»[39m tests/imageUploadArea.test.tsx [2m([22m[2m3 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[32m 56[2mms[22m[39m
+[31m     [31m├ù[31m renders upload area initially[39m[32m 39[2mms[22m[39m
+[31m     [31m├ù[31m handles file selection[39m[32m 8[2mms[22m[39m
+[31m     [31m├ù[31m triggers conversion on button click[39m[32m 7[2mms[22m[39m
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Tests 3 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  tests/imageUploadArea.test.tsx > ImageUploadArea > renders upload area initially
+TestingLibraryElementError: Unable to find an element with the text: /Drag & Drop or Click to Upload/i. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="flex-1 flex flex-col items-center justify-center p-8 bg-transparent"
+    >
+      <div
+        class="
+                        w-full max-w-xl h-96 border-4 border-dashed rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-all duration-300
+                        border-black/10 dark:border-white/10 hover:border-cyan-400 dark:hover:border-cyan-600 hover:bg-black/5 dark:hover:bg-white/5
+                    "
+      >
+        <input
+          accept="image/*"
+          class="hidden"
+          type="file"
+        />
+        <div
+          class="w-20 h-20 mb-6 rounded-2xl bg-black/5 dark:bg-white/5 flex items-center justify-center"
+        >
+          <svg
+            class="w-10 h-10 text-slate-400 dark:text-white/40"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.5"
+            />
+          </svg>
+        </div>
+        <h3
+          class="text-xl font-bold text-slate-700 dark:text-white mb-2"
+        >
+          Upload Image
+        </h3>
+        <p
+          class="text-slate-500 dark:text-white/50 text-center max-w-xs"
+        >
+          Drag & drop an image here, or click to browse
+        </p>
+        <p
+          class="mt-4 text-xs text-slate-400 dark:text-white/30 font-mono"
+        >
+          Supports PNG, JPG, JPEG
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+ Γ¥» Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:76:38
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ Γ¥» tests/imageUploadArea.test.tsx:49:23
+     47|     it('renders upload area initially', () => {
+     48|         renderComponent();
+     49|         expect(screen.getByText(/Drag & Drop or Click to Upload/i)).toΓÇª
+       |                       ^
+     50|     });
+     51| 
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/3]ΓÄ»
+
+ FAIL  tests/imageUploadArea.test.tsx > ImageUploadArea > handles file selection
+TestingLibraryElementError: Unable to find a label with the text of: /Drag & Drop or Click to Upload/i
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="flex-1 flex flex-col items-center justify-center p-8 bg-transparent"
+    >
+      <div
+        class="
+                        w-full max-w-xl h-96 border-4 border-dashed rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-all duration-300
+                        border-black/10 dark:border-white/10 hover:border-cyan-400 dark:hover:border-cyan-600 hover:bg-black/5 dark:hover:bg-white/5
+                    "
+      >
+        <input
+          accept="image/*"
+          class="hidden"
+          type="file"
+        />
+        <div
+          class="w-20 h-20 mb-6 rounded-2xl bg-black/5 dark:bg-white/5 flex items-center justify-center"
+        >
+          <svg
+            class="w-10 h-10 text-slate-400 dark:text-white/40"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.5"
+            />
+          </svg>
+        </div>
+        <h3
+          class="text-xl font-bold text-slate-700 dark:text-white mb-2"
+        >
+          Upload Image
+        </h3>
+        <p
+          class="text-slate-500 dark:text-white/50 text-center max-w-xs"
+        >
+          Drag & drop an image here, or click to browse
+        </p>
+        <p
+          class="mt-4 text-xs text-slate-400 dark:text-white/30 font-mono"
+        >
+          Supports PNG, JPG, JPEG
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+ Γ¥» Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+ Γ¥» getAllByLabelText node_modules/@testing-library/dom/dist/queries/label-text.js:111:38
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ Γ¥» tests/imageUploadArea.test.tsx:55:30
+     53|         renderComponent();
+     54|         const file = new File(['dummy content'], 'test.png', { type: 'ΓÇª
+     55|         const input = screen.getByLabelText(/Drag & Drop or Click to UΓÇª
+       |                              ^
+     56| 
+     57|         // Check if input exists (it might be hidden but accessible viΓÇª
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[2/3]ΓÄ»
+
+ FAIL  tests/imageUploadArea.test.tsx > ImageUploadArea > triggers conversion on button click
+TestingLibraryElementError: Unable to find a label with the text of: /Drag & Drop or Click to Upload/i
+
+Ignored nodes: comments, script, style
+<body>
+  <div>
+    <div
+      class="flex-1 flex flex-col items-center justify-center p-8 bg-transparent"
+    >
+      <div
+        class="
+                        w-full max-w-xl h-96 border-4 border-dashed rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-all duration-300
+                        border-black/10 dark:border-white/10 hover:border-cyan-400 dark:hover:border-cyan-600 hover:bg-black/5 dark:hover:bg-white/5
+                    "
+      >
+        <input
+          accept="image/*"
+          class="hidden"
+          type="file"
+        />
+        <div
+          class="w-20 h-20 mb-6 rounded-2xl bg-black/5 dark:bg-white/5 flex items-center justify-center"
+        >
+          <svg
+            class="w-10 h-10 text-slate-400 dark:text-white/40"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="1.5"
+            />
+          </svg>
+        </div>
+        <h3
+          class="text-xl font-bold text-slate-700 dark:text-white mb-2"
+        >
+          Upload Image
+        </h3>
+        <p
+          class="text-slate-500 dark:text-white/50 text-center max-w-xs"
+        >
+          Drag & drop an image here, or click to browse
+        </p>
+        <p
+          class="mt-4 text-xs text-slate-400 dark:text-white/30 font-mono"
+        >
+          Supports PNG, JPG, JPEG
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+ Γ¥» Object.getElementError node_modules/@testing-library/dom/dist/config.js:37:19
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[90m (3)[39m
+[2m   Start at [22m 21:53:15
+ Γ¥» getAllByLabelText node_modules/@testing-library/dom/dist/queries/label-text.js:111:38
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:52:17
+ Γ¥» node_modules/@testing-library/dom/dist/query-helpers.js:95:19
+ Γ¥» tests/imageUploadArea.test.tsx:74:30
+     72|         renderComponent();
+     73|         const file = new File(['dummy content'], 'test.png', { type: 'ΓÇª
+     74|         const input = screen.getByLabelText(/Drag & Drop or Click to UΓÇª
+       |                              ^
+     75| 
+     76|         Object.defineProperty(input, 'files', {
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[3/3]ΓÄ»
+
+[2m   Duration [22m 3.47s[2m (transform 224ms, setup 1.00s, import 394ms, tests 56ms, environment 1.65s)[22m
+

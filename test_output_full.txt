@@ -1,0 +1,79 @@
+
+> inktex@0.0.0 test
+> vitest run
+
+
+[1m[46m RUN [49m[22m [36mv4.0.15 [39m[90mD:/GitHub/TeXFlow/InkTex[39m
+
+stderr | tests/beamSearch.test.ts > beamSearch > should pass pixel_values to forward (THE FIX)
+[DEBUG] Beam step error: Error: STOP_TEST
+    at Object.<anonymous> (D:/GitHub/TeXFlow/InkTex/tests/beamSearch.test.ts:61:13)
+    at Object.Mock [as forward] (file:///D:/GitHub/TeXFlow/InkTex/node_modules/@vitest/spy/dist/index.js:285:34)
+    at Module.beamSearch (D:/GitHub/TeXFlow/InkTex/services/inference/beamSearch.ts:76:42)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at D:/GitHub/TeXFlow/InkTex/tests/beamSearch.test.ts:65:7
+    at file:///D:/GitHub/TeXFlow/InkTex/node_modules/@vitest/runner/dist/index.js:915:20
+
+ [32mΓ£ô[39m tests/beamSearch.test.ts [2m([22m[2m2 tests[22m[2m)[22m[32m 20[2mms[22m[39m
+ [32mΓ£ô[39m tests/latexFormatter.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 13[2mms[22m[39m
+[90mstdout[2m | tests/inferenceService.test.ts[2m > [22m[2mInferenceService[2m > [22m[2mshould queue concurrent requests
+[22m[39m[InferenceService] New request pending. Allowing current inference 3s grace period...
+
+stderr | tests/inferenceService.test.ts > InferenceService > should force dispose and abort current inference
+[InferenceService] Inference aborted.
+
+ [32mΓ£ô[39m tests/inferenceService.test.ts [2m([22m[2m4 tests[22m[2m)[22m[32m 126[2mms[22m[39m
+ [31mΓ¥»[39m tests/transformersPipeline.test.ts [2m([22m[2m1 test[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 1758[2mms[22m[39m
+[31m     [31m├ù[31m should run image-to-text pipeline on test image[39m[33m 1754[2mms[22m[39m
+[90mstdout[2m | tests/inferenceIntegration.test.ts[2m > [22m[2mInferenceService Integration[2m > [22m[2mshould run end-to-end inference on test image
+[22m[39mLoading tokenizer...
+
+[90mstdout[2m | tests/inferenceIntegration.test.ts[2m > [22m[2mInferenceService Integration[2m > [22m[2mshould run end-to-end inference on test image
+[22m[39mLoading model with cpu (fp32)... (this may take a while)
+
+stderr | tests/imageUploadArea.test.tsx > ImageUploadArea > triggers conversion on button click
+An update to Wrapper inside a test was not wrapped in act(...).
+
+When testing, code that causes React state updates should be wrapped into act(...):
+
+act(() => {
+  /* fire events that update state */
+});
+/* assert on the output */
+
+This ensures that you're testing the behavior the user would see in the browser. Learn more at https://react.dev/link/wrap-tests-with-act
+
+ [32mΓ£ô[39m tests/imageUploadArea.test.tsx [2m([22m[2m3 tests[22m[2m)[22m[32m 105[2mms[22m[39m
+ [32mΓ£ô[39m tests/header.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 117[2mms[22m[39m
+2025-12-05 22:56:53.4713443 [E:onnxruntime:, inference_session.cc:2197 onnxruntime::InferenceSession::Initialize::<lambda_1edbd02637ef946ebbec235c0ea04f5d>::operator ()] Exception during initialization: bad allocation
+stderr | tests/inferenceIntegration.test.ts > InferenceService Integration > should run end-to-end inference on test image
+Failed to load model: Error: Exception during initialization: bad allocation
+    at new OnnxruntimeSessionHandler (D:\GitHub\TeXFlow\InkTex\node_modules\@huggingface\transformers\node_modules\onnxruntime-node\dist\backend.js:25:92)
+    at Immediate.<anonymous> (D:\GitHub\TeXFlow\InkTex\node_modules\@huggingface\transformers\node_modules\onnxruntime-node\dist\backend.js:67:29)
+    at processImmediate (node:internal/timers:505:21)
+
+ [31mΓ¥»[39m tests/inferenceIntegration.test.ts [2m([22m[2m1 test[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 50989[2mms[22m[39m
+[31m     [31m├ù[31m should run end-to-end inference on test image[39m[33m 50987[2mms[22m[39m
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Tests 2 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  tests/inferenceIntegration.test.ts > InferenceService Integration > should run end-to-end inference on test image
+Error: Exception during initialization: bad allocation
+ Γ¥» new OnnxruntimeSessionHandler node_modules/@huggingface/transformers/node_modules/onnxruntime-node/dist/backend.js:25:92
+ Γ¥» Immediate.<anonymous> node_modules/@huggingface/transformers/node_modules/onnxruntime-node/dist/backend.js:67:29
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/2]ΓÄ»
+
+ FAIL  tests/transformersPipeline.test.ts > Transformers Pipeline > should run image-to-text pipeline on test image
+Error: Load model from D:\GitHub\TeXFlow\InkTex\node_modules\@huggingface\transformers\.cache\onnx-community\TexTeller3-ONNX\onnx\decoder_model_merged.onnx failed:bad allocation
+ Γ¥» new OnnxruntimeSessionHandler node_modules/@huggingface/transformers/node_modules/onnxruntime-node/dist/backend.js:25:92
+ Γ¥» Immediate.<anonymous> node_modules/@huggingface/transformers/node_modules/onnxruntime-node/dist/backend.js:67:29
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[2/2]ΓÄ»
+
+
+[2m Test Files [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m5 passed[39m[22m[90m (7)[39m
+[2m      Tests [22m [1m[31m2 failed[39m[22m[2m | [22m[1m[32m17 passed[39m[22m[90m (19)[39m
+[2m   Start at [22m 22:55:58
+[2m   Duration [22m 55.43s[2m (transform 1.29s, setup 10.44s, import 4.53s, tests 53.13s, environment 4.88s)[22m
+

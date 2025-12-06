@@ -40,6 +40,7 @@ declare global {
       svg: { fontCache: string };
       startup: { typeset: boolean };
       typesetPromise: (nodes?: Element[]) => Promise<void>;
+      typesetClear: (nodes?: Element[]) => void;
       tex2chtml: (tex: string) => HTMLElement;
     };
     ort: {

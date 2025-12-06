@@ -61,11 +61,21 @@ export function QuantizationSelector({ value, onChange }: QuantizationSelectorPr
             border: `1px solid ${theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
             borderRadius: '0.5rem',
         }),
-        option: (provided, { isSelected, isFocused }) => ({
+        option: (provided, { isSelected, isFocused, isDisabled }) => ({
             ...provided,
-            backgroundColor: isSelected ? (theme === 'dark' ? 'rgb(6 182 212)' : 'rgb(6 182 212)') : isFocused ? (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)') : 'transparent',
-            color: isSelected ? 'white' : (theme === 'dark' ? 'white' : '#1f2937'),
+            backgroundColor: isSelected
+                ? (theme === 'dark' ? 'rgb(6 182 212)' : 'rgb(6 182 212)')
+                : isFocused
+                    ? (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)')
+                    : 'transparent',
+            color: isDisabled
+                ? (theme === 'dark' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(0, 0, 0, 0.3)')
+                : isSelected
+                    ? 'white'
+                    : (theme === 'dark' ? 'white' : '#1f2937'),
             fontSize: '0.875rem',
+            cursor: isDisabled ? 'not-allowed' : 'default',
+            opacity: isDisabled ? 0.5 : 1,
         }),
     };
 

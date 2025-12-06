@@ -16,6 +16,8 @@ const Header: React.FC = () => {
         setProvider,
         showVisualDebugger,
         setShowVisualDebugger,
+        activeTab,
+        setActiveTab,
     } = useAppContext();
     const { theme, toggleTheme } = useThemeContext();
 
@@ -49,6 +51,31 @@ const Header: React.FC = () => {
 
             {/* Right: Controls */}
             <div className="flex items-center gap-4">
+
+                {/* Tab Switcher */}
+                <div className="hidden md:flex items-center p-1 bg-black/5 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/5">
+                    <button
+                        onClick={() => setActiveTab('draw')}
+                        className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${activeTab === 'draw'
+                            ? 'bg-white dark:bg-white/10 text-slate-800 dark:text-white shadow-sm'
+                            : 'text-slate-400 dark:text-white/40 hover:text-slate-600 dark:hover:text-white/80'
+                            }`}
+                    >
+                        Draw
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('upload')}
+                        className={`px-3 py-1 text-xs font-bold rounded-lg transition-all ${activeTab === 'upload'
+                            ? 'bg-white dark:bg-white/10 text-slate-800 dark:text-white shadow-sm'
+                            : 'text-slate-400 dark:text-white/40 hover:text-slate-600 dark:hover:text-white/80'
+                            }`}
+                    >
+                        Upload
+                    </button>
+                </div>
+
+                {/* Separator */}
+                <div className="hidden md:block w-px h-6 bg-black/5 dark:bg-white/5"></div>
 
                 {/* Candidate Count Group */}
                 <div className="hidden md:flex items-center p-1 bg-black/5 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/5">
@@ -137,8 +164,8 @@ const Header: React.FC = () => {
                 <button
                     onClick={() => setShowVisualDebugger(!showVisualDebugger)}
                     className={`w-9 h-9 rounded-xl border flex items-center justify-center transition-all shadow-sm ${showVisualDebugger
-                            ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-600 dark:text-cyan-400'
-                            : 'bg-black/5 dark:bg-white/5 border-black/5 dark:border-white/5 text-slate-500 dark:text-white/40 hover:text-cyan-500 dark:hover:text-cyan-400 hover:bg-black/10 dark:hover:bg-white/10'
+                        ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-600 dark:text-cyan-400'
+                        : 'bg-black/5 dark:bg-white/5 border-black/5 dark:border-white/5 text-slate-500 dark:text-white/40 hover:text-cyan-500 dark:hover:text-cyan-400 hover:bg-black/10 dark:hover:bg-white/10'
                         }`}
                     title={showVisualDebugger ? "Hide Visual Debugger" : "Show Visual Debugger"}
                 >

@@ -199,11 +199,12 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = INFE
       ctx.drawImage(img, 0, 0);
 
       // Run inference
-      await infer(canvas);
+      return await infer(canvas);
 
     } catch (error) {
       console.error('Error loading reference image:', error);
       setStatus('error');
+      return null;
     }
   }, [infer]);
 

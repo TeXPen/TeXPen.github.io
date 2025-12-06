@@ -1,0 +1,68 @@
+
+> inktex@0.0.0 test
+> vitest run tests/imageUploadArea.test.tsx
+
+
+[1m[46m RUN [49m[22m [36mv4.0.15 [39m[90mD:/GitHub/TeXFlow/InkTex[39m
+
+ [31mΓ¥»[39m tests/imageUploadArea.test.tsx [2m([22m[2m3 tests[22m[2m | [22m[31m3 failed[39m[2m)[22m[32m 12[2mms[22m[39m
+[31m     [31m├ù[31m renders upload area initially[39m[32m 8[2mms[22m[39m
+[31m     [31m├ù[31m handles file selection[39m[32m 1[2mms[22m[39m
+[31m     [31m├ù[31m triggers conversion on button click[39m[32m 1[2mms[22m[39m
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Tests 3 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  tests/imageUploadArea.test.tsx > ImageUploadArea > renders upload area initially
+Error: Target container is not a DOM element.
+ Γ¥» Object.process.env.NODE_ENV.exports.createRoot node_modules/react-dom/cjs/react-dom-client.development.js:28014:15
+ Γ¥» createConcurrentRoot node_modules/@testing-library/react/dist/pure.js:147:27
+ Γ¥» render node_modules/@testing-library/react/dist/pure.js:266:12
+ Γ¥» renderComponent tests/imageUploadArea.test.tsx:39:16
+     37| 
+     38|     const renderComponent = () => {
+     39|         return render(
+       |                ^
+     40|             <AppContext.Provider value={defaultContext}>
+     41|                 <ImageUploadArea />
+ Γ¥» tests/imageUploadArea.test.tsx:47:9
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/3]ΓÄ»
+
+ FAIL  tests/imageUploadArea.test.tsx > ImageUploadArea > handles file selection
+Error: Target container is not a DOM element.
+ Γ¥» Object.process.env.NODE_ENV.exports.createRoot node_modules/react-dom/cjs/react-dom-client.development.js:28014:15
+ Γ¥» createConcurrentRoot node_modules/@testing-library/react/dist/pure.js:147:27
+ Γ¥» render node_modules/@testing-library/react/dist/pure.js:266:12
+ Γ¥» renderComponent tests/imageUploadArea.test.tsx:39:16
+     37| 
+     38|     const renderComponent = () => {
+     39|         return render(
+       |                ^
+     40|             <AppContext.Provider value={defaultContext}>
+     41|                 <ImageUploadArea />
+ Γ¥» tests/imageUploadArea.test.tsx:52:9
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[2/3]ΓÄ»
+
+ FAIL  tests/imageUploadArea.test.tsx > ImageUploadArea > triggers conversion on button click
+Error: Target container is not a DOM element.
+ Γ¥» Object.process.env.NODE_ENV.exports.createRoot node_modules/react-dom/cjs/react-dom-client.development.js:28014:15
+ Γ¥» createConcurrentRoot node_modules/@testing-library/react/dist/pure.js:147:27
+ Γ¥» render node_modules/@testing-library/react/dist/pure.js:266:12
+ Γ¥» renderComponent tests/imageUploadArea.test.tsx:39:16
+     37| 
+     38|     const renderComponent = () => {
+     39|         return render(
+       |                ^
+     40|             <AppContext.Provider value={defaultContext}>
+     41|                 <ImageUploadArea />
+ Γ¥» tests/imageUploadArea.test.tsx:71:9
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[3/3]ΓÄ»
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m3 failed[39m[22m[90m (3)[39m
+[2m   Start at [22m 21:48:24
+[2m   Duration [22m 3.34s[2m (transform 311ms, setup 2.29s, import 557ms, tests 12ms, environment 0ms)[22m
+

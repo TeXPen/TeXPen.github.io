@@ -15,9 +15,9 @@ const LoadingOverlay: React.FC = () => {
     const needsConfirmation = !userConfirmed && !isLoadedFromCache;
     const onConfirm = () => setUserConfirmed(true);
 
-    // Only show full overlay for initial model loading, not during inference
-    const isInitialLoading = status === 'loading' && loadingPhase.includes('model');
-    const showFullOverlay = isInitialLoading || status === 'error';
+    // Only show full overlay for initial permission/confirmation or errors.
+    // We NO LONGER show it for standard model loading (handled by Main.tsx toast).
+    const showFullOverlay = (status === 'error') || (!userConfirmed && !isLoadedFromCache);
 
     if (!showFullOverlay) {
         return null;
@@ -61,20 +61,8 @@ const LoadingOverlay: React.FC = () => {
                             </button>
                         </>
                     ) : (
-                        <>
-                            <div className="text-6xl mb-4 animate-pulse">🧠</div>
-                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-                                Loading AI Model
-                            </h2>
-                            <p className="text-gray-500 dark:text-gray-500 text-xs mt-2">
-                                {loadingPhase} {progress > 0 && `(${Math.round(progress)}%)`}
-                            </p>
-                            {isLoadedFromCache && (
-                                <p className="text-gray-500 dark:text-gray-500 text-xs mt-1">
-                                    (Loaded from cache)
-                                </p>
-                            )}
-                        </>
+                        /* Should not happen given showFullOverlay logic, but fallback */
+                        null
                     )}
                 </div>
             </div>

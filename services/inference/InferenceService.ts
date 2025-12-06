@@ -261,6 +261,18 @@ export class InferenceService {
       return;
     }
 
+    // Force abort any running inference
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+
+    // Reject any pending request
+    if (this.pendingRequest) {
+      this.pendingRequest.reject(new Error("Aborted"));
+      this.pendingRequest = null;
+    }
+
     // If loading is in progress, we can't easily cancel the promise, but we can reset the state.
     // Ideally we should await initPromise, but that might deadlock if dispose is called from within init (reconfig).
     // For now, we assume dispose logic cleans up what it can.

@@ -7,8 +7,9 @@ interface OutputDisplayProps {
 }
 
 const OutputDisplay: React.FC<OutputDisplayProps> = ({ latex, isInferencing = false }) => {
-    // Trigger MathJax on latex change for specific container
-    useMathJax(latex, 'latex-output');
+    // Trigger MathJax on latex change OR when inferencing ends (spinner hidden)
+    // We pass both values so MathJax re-typesets when transitioning from spinner to content
+    useMathJax({ latex, isInferencing }, 'latex-output');
 
     const handleCopy = () => {
         if (latex) navigator.clipboard.writeText(latex);

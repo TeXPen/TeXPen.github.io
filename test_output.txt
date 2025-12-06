@@ -1,0 +1,35 @@
+
+> inktex@0.0.0 test
+> vitest run tests/inferenceService.test.ts
+
+
+[1m[46m RUN [49m[22m [36mv4.0.15 [39m[90mD:/GitHub/TeXFlow/InkTex[39m
+
+[90mstdout[2m | tests/inferenceService.test.ts[2m > [22m[2mInferenceService[2m > [22m[2mshould queue concurrent requests
+[22m[39m[InferenceService] New request pending. Allowing current inference 3s grace period...
+
+ [31mΓ¥»[39m tests/inferenceService.test.ts [2m([22m[2m3 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 142[2mms[22m[39m
+     [32mΓ£ô[39m should initialize model and tokenizer[32m 7[2mms[22m[39m
+     [32mΓ£ô[39m should run single candidate inference using beamSearch[32m 6[2mms[22m[39m
+[31m     [31m├ù[31m should queue concurrent requests[39m[32m 126[2mms[22m[39m
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Tests 1 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  tests/inferenceService.test.ts > InferenceService > should queue concurrent requests
+ReferenceError: inferencePromise is not defined
+ Γ¥» tests/inferenceService.test.ts:120:18
+    118| 
+    119|     // The inference should reject or settle
+    120|     await expect(inferencePromise).rejects.toThrow("Aborted");
+       |                  ^
+    121|   });
+    122| });
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/1]ΓÄ»
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m2 passed[39m[22m[90m (3)[39m
+[2m   Start at [22m 21:44:29
+[2m   Duration [22m 6.91s[2m (transform 617ms, setup 2.85s, import 434ms, tests 142ms, environment 0ms)[22m
+

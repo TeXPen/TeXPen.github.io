@@ -1,0 +1,73 @@
+
+> inktex@0.0.0 test
+> vitest run tests/header.test.tsx
+
+
+[1m[46m RUN [49m[22m [36mv4.0.15 [39m[90mD:/GitHub/TeXFlow/InkTex[39m
+
+ [31mΓ¥»[39m tests/header.test.tsx [2m([22m[2m4 tests[22m[2m | [22m[31m4 failed[39m[2m)[22m[32m 15[2mms[22m[39m
+[31m     [31m├ù[31m renders correct active tab styling[39m[32m 7[2mms[22m[39m
+[31m     [31m├ù[31m switches tabs when clicked[39m[32m 2[2mms[22m[39m
+[31m     [31m├ù[31m toggles sidebar[39m[32m 2[2mms[22m[39m
+[31m     [31m├ù[31m toggles theme[39m[32m 1[2mms[22m[39m
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Tests 4 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  tests/header.test.tsx > Header > renders correct active tab styling
+TypeError: Cannot read properties of undefined (reading 'Provider')
+ Γ¥» renderHeader tests/header.test.tsx:44:23
+     42| const renderHeader = (appOverrides = {}, themeOverrides = {}) => {
+     43|     return render(
+     44|         <ThemeContext.Provider value={{ ...defaultThemeContext, ...theΓÇª
+       |                       ^
+     45|             <AppContext.Provider value={{ ...defaultAppContext, ...appΓÇª
+     46|                 <Header />
+ Γ¥» tests/header.test.tsx:58:9
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/4]ΓÄ»
+
+ FAIL  tests/header.test.tsx > Header > switches tabs when clicked
+TypeError: Cannot read properties of undefined (reading 'Provider')
+ Γ¥» renderHeader tests/header.test.tsx:44:23
+     42| const renderHeader = (appOverrides = {}, themeOverrides = {}) => {
+     43|     return render(
+     44|         <ThemeContext.Provider value={{ ...defaultThemeContext, ...theΓÇª
+       |                       ^
+     45|             <AppContext.Provider value={{ ...defaultAppContext, ...appΓÇª
+     46|                 <Header />
+ Γ¥» tests/header.test.tsx:67:9
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[2/4]ΓÄ»
+
+ FAIL  tests/header.test.tsx > Header > toggles sidebar
+TypeError: Cannot read properties of undefined (reading 'Provider')
+ Γ¥» renderHeader tests/header.test.tsx:44:23
+     42| const renderHeader = (appOverrides = {}, themeOverrides = {}) => {
+     43|     return render(
+     44|         <ThemeContext.Provider value={{ ...defaultThemeContext, ...theΓÇª
+       |                       ^
+     45|             <AppContext.Provider value={{ ...defaultAppContext, ...appΓÇª
+     46|                 <Header />
+ Γ¥» tests/header.test.tsx:75:9
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[3/4]ΓÄ»
+
+ FAIL  tests/header.test.tsx > Header > toggles theme
+TypeError: Cannot read properties of undefined (reading 'Provider')
+ Γ¥» renderHeader tests/header.test.tsx:44:23
+     42| const renderHeader = (appOverrides = {}, themeOverrides = {}) => {
+     43|     return render(
+     44|         <ThemeContext.Provider value={{ ...defaultThemeContext, ...theΓÇª
+       |                       ^
+     45|             <AppContext.Provider value={{ ...defaultAppContext, ...appΓÇª
+     46|                 <Header />
+ Γ¥» tests/header.test.tsx:82:9
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[4/4]ΓÄ»
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m4 failed[39m[22m[90m (4)[39m
+[2m   Start at [22m 22:44:50
+[2m   Duration [22m 5.63s[2m (transform 443ms, setup 1.74s, import 690ms, tests 15ms, environment 2.56s)[22m
+

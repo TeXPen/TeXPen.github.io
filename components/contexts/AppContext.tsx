@@ -16,7 +16,7 @@ interface AppContextType {
     setLatex: (latex: string) => void;
     candidates: Candidate[];
     infer: (canvas: HTMLCanvasElement) => Promise<{ latex: string; candidates: Candidate[] } | null>;
-    inferFromUrl: (url: string) => Promise<void>;
+    inferFromUrl: (url: string) => Promise<{ latex: string; candidates: Candidate[] } | null>;
     clearModel: () => void;
     loadingPhase: string;
     isInferencing: boolean;
@@ -43,8 +43,12 @@ interface AppContextType {
     setSelectedIndex: (index: number) => void;
     selectCandidate: (index: number) => void;
 
-    // History Actions (Proxied for convenience if needed, or components can use HistoryContext directly)
+    // History Actions
     loadFromHistory: (item: HistoryItem) => void;
+
+    // Tab Interface
+    activeTab: 'draw' | 'upload';
+    setActiveTab: (tab: 'draw' | 'upload') => void;
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -53,6 +57,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const { theme } = useThemeContext();
     const [quantization, setQuantization] = useState<string>(INFERENCE_CONFIG.DEFAULT_QUANTIZATION);
     const [provider, setProvider] = useState<Provider>(INFERENCE_CONFIG.DEFAULT_PROVIDER as Provider);
+    const [activeTab, setActiveTab] = useState<'draw' | 'upload'>('draw');
 
     useEffect(() => {
         isWebGPUAvailable().then(available => {
@@ -90,6 +95,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const loadFromHistory = (item: HistoryItem) => {
         setLatex(item.latex);
         setSelectedIndex(0);
+        // If history item is selected, we might want to switch to 'draw' tab?
+        // Let's assume yes for now.
+        setActiveTab('draw');
     };
 
     const toggleSidebar = () => {
@@ -139,6 +147,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // History
         loadFromHistory,
+
+        // Tab
+        activeTab,
+        setActiveTab
     };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

@@ -73,7 +73,7 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({ theme, onStrokeEnd, onClear }) 
     }, [redo]);
 
     return (
-        <div className="flex-1 relative bg-[#f7f7f7] dark:bg-[#080808] group cursor-crosshair overflow-hidden transition-colors duration-500">
+        <div className="flex-1 relative bg-transparent group cursor-crosshair overflow-hidden transition-colors duration-500">
             <CanvasToolbar
                 activeTool={activeTool}
                 onToolChange={setActiveTool}

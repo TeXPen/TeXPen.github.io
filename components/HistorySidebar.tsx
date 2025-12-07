@@ -72,7 +72,7 @@ const MathHistoryItem: React.FC<{ latex: string }> = ({ latex }) => {
     }, []);
 
     return (
-        <div ref={parentRef} className="relative h-8 flex items-center overflow-hidden w-full">
+        <div ref={parentRef} className="relative min-h-8 h-auto py-2 flex items-center w-full group/item">
             <div
                 ref={ref}
                 className="text-xs text-slate-700 dark:text-white/80 font-mono w-full whitespace-nowrap transition-transform origin-left"
@@ -80,7 +80,8 @@ const MathHistoryItem: React.FC<{ latex: string }> = ({ latex }) => {
             >
                 {`\\(${cleanLatex}\\)`}
             </div>
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-[#0c0c0c] to-transparent pointer-events-none" />
+            {/* Gradient overlay - adjusts to height */}
+            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-[#0c0c0c] to-transparent pointer-events-none rounded-r-xl" />
         </div>
     );
 };

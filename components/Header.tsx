@@ -92,7 +92,7 @@ const Header: React.FC = () => {
                             {/* Tooltip */}
                             <div className="absolute top-full right-0 mt-2 w-48 p-2 bg-white dark:bg-[#111] border border-black/10 dark:border-white/10 rounded-lg shadow-xl backdrop-blur-xl z-50 opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible transition-all duration-200 text-left pointer-events-none">
                                 <p className="text-[10px] text-slate-500 dark:text-white/60 leading-tight w-40">
-                                    The AI generates multiple potential interpretations (candidates) of your handwriting. Choosing more candidates increases accuracy but may be slightly slower.
+                                    The model generates multiple guesses for your input to improve accuracy. Choosing more candidates may be slightly slower.
                                 </p>
                             </div>
                         </div>

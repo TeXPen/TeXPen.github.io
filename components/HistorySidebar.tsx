@@ -272,24 +272,11 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
                             return (
                                 <div
                                     key={item.id}
-                                    className="group relative p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] hover:bg-black/[0.05] dark:hover:bg-white/[0.05] border border-transparent hover:border-black/5 dark:hover:border-white/5 transition-all cursor-pointer"
+                                    className="group relative p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] hover:bg-black/[0.05] dark:hover:bg-white/[0.05] border border-black/5 dark:border-white/10 transition-all cursor-pointer"
                                     onClick={() => onSelect(item)}
                                 >
-                                    <div className="flex items-center justify-between mb-2 whitespace-nowrap overflow-hidden">
+                                    <div className="flex items-center justify-between mb-1 whitespace-nowrap overflow-hidden">
                                         <div className="flex items-center gap-2 overflow-hidden">
-                                            {item.versions && item.versions.length > 1 && (
-                                                <button
-                                                    onClick={(e) => toggleExpand(e, item.id)}
-                                                    className={`
-                                                        p-1 rounded-md text-slate-400 dark:text-white/30 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-black/5 dark:hover:bg-white/5 transition-all
-                                                        ${expandedItems.has(item.id) ? 'rotate-90 text-cyan-600 dark:text-cyan-400' : ''}
-                                                    `}
-                                                >
-                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                                                    </svg>
-                                                </button>
-                                            )}
                                             {item.source === 'upload' && (
                                                 <span className="flex-none p-1 rounded-md bg-purple-100 dark:bg-purple-500/20 text-purple-600 dark:text-purple-300" title="Uploaded Image">
                                                     <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -302,7 +289,19 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
                                                     <PenIcon />
                                                 </span>
                                             )}
-
+                                            {item.source !== 'upload' && item.versions && item.versions.length > 1 && (
+                                                <button
+                                                    onClick={(e) => toggleExpand(e, item.id)}
+                                                    className={`
+                                                        p-1 rounded-md text-slate-400 dark:text-white/30 hover:text-cyan-600 dark:hover:text-cyan-400 hover:bg-black/5 dark:hover:bg-white/5 transition-all
+                                                        ${expandedItems.has(item.id) ? 'rotate-90 text-cyan-600 dark:text-cyan-400' : ''}
+                                                    `}
+                                                >
+                                                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+                                                    </svg>
+                                                </button>
+                                            )}
                                         </div>
                                         {!isConfirming && (
                                             <button

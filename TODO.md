@@ -1,6 +1,7 @@
 Priority
 
 Bugs
+- [x] Fix subhistory dropdowns getting applied to image upload items
 
 Behavior
 

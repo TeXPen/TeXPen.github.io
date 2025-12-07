@@ -59,6 +59,9 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = INFE
     checkCache();
   }, [config.encoderModelUrl]);
 
+  // Track previous settings to detect actual changes vs StrictMode re-runs
+  const prevSettingsRef = useRef<{ quantization: string; provider: string } | null>(null);
+
   // Initialize model on mount, dispose on unmount or settings change
   useEffect(() => {
     let isCancelled = false;
@@ -88,6 +91,8 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = INFE
         if (!isCancelled) {
           setStatus('idle');
           setLoadingPhase('');
+          // Track that we successfully loaded with these settings
+          prevSettingsRef.current = { quantization, provider };
         }
       } catch (error) {
         if (isCancelled) return; // Ignore errors if cancelled
@@ -101,32 +106,25 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = INFE
       initModel();
     }
 
-    // Cleanup: dispose model when settings change or component unmounts
+    // Cleanup: only dispose if settings actually changed (not just StrictMode re-run)
     return () => {
       isCancelled = true;
-      // Only dispose if we were confirmed (model was potentially loaded)
-      if (userConfirmed) {
+      // Check if settings actually changed - if same settings, DON'T dispose
+      // The InferenceService singleton will reuse the existing model
+      const settingsChanged = prevSettingsRef.current &&
+        (prevSettingsRef.current.quantization !== quantization ||
+          prevSettingsRef.current.provider !== provider);
+
+      if (settingsChanged && userConfirmed) {
+        console.log('[useInkModel] Settings changed, disposing model...');
         inferenceService.dispose().catch((err) => {
-          // Ignore disposal errors (e.g., if inference is in progress)
           console.warn('Model disposal during cleanup:', err.message);
         });
       }
     };
   }, [quantization, provider, userConfirmed, isLoadedFromCache]);
 
-  // Cleanup on page unload (refresh/close)
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      // Attempt to dispose model before page unloads
-      // Note: async operations may not complete, but we try
-      inferenceService.dispose().catch(() => { });
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, []);
+  // Note: beforeunload cleanup is now handled directly in InferenceService.ts
 
   const infer = useCallback(async (canvas: HTMLCanvasElement) => {
     // Increment counter and set inferencing state

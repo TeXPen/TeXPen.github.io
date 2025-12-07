@@ -1,7 +1,6 @@
 Priority
 
 Bugs
-- [ ] Safeguard against memory leak, double loading model, etc.
 
 Behavior
 
@@ -14,3 +13,6 @@ Visuals
 
 Maintenance
 - [ ] refactor and add tests
+
+Roadmap
+- [ ] Enable loading custom model locally or from HuggingFace?

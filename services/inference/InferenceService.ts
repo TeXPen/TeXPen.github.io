@@ -23,76 +23,140 @@ export class InferenceService {
     return InferenceService.instance;
   }
 
+  private disposalGeneration: number = 0;
+  private loadingMutex: Promise<void> = Promise.resolve();
+
   public async init(onProgress?: (status: string, progress?: number) => void, options: InferenceOptions = {}): Promise<void> {
     // If initialization is already in progress, return the existing promise
     if (this.initPromise) {
       return this.initPromise;
     }
 
-    this.initPromise = (async () => {
+    // Append our actual work to the mutex chain
+    const work = async () => {
+      const localGeneration = this.disposalGeneration;
+
       if (this.model && this.tokenizer) {
         // If the model is already loaded, but the quantization or device is different, we need to dispose and reload.
         if ((options.dtype && (this.model as any).config.dtype !== options.dtype) ||
           (options.device && (this.model as any).config.device !== options.device)) {
+
           if (this.isInferring) {
-            console.warn("Changing model settings while inference is in progress. Waiting for it to finish or forceful disposal might occur.");
-            // Ideally we should wait, but for now we proceed to dispose which checks isInferring
-            // For safety in init, we might want to throw or wait. 
-            // Current decision: Throw if inferring, same as before, but wrapped in promise.
-            if (this.isInferring) {
-              throw new Error("Cannot change model settings while an inference is in progress.");
-            }
+            console.warn("Changing model settings while inference is in progress.");
+            throw new Error("Cannot change model settings while an inference is in progress.");
           }
           await this.dispose();
+          if (this.disposalGeneration !== localGeneration) {
+            return;
+          }
         } else {
+          // Already loaded with correct settings
           return;
         }
       }
 
       try {
-        if (onProgress) onProgress('Loading tokenizer...');
-        this.tokenizer = await AutoTokenizer.from_pretrained(INFERENCE_CONFIG.MODEL_ID);
+        // CHECK GENERATION before starting heavy work
+        if (this.disposalGeneration !== localGeneration) return;
+
+        // Check if we just refreshed OR a previous load was interrupted
+        const UNLOAD_KEY = '__inktex_unloading__';
+        const LOADING_KEY = '__inktex_loading__';
+
+        if (typeof sessionStorage !== 'undefined') {
+          const unloadTime = sessionStorage.getItem(UNLOAD_KEY);
+          const wasLoading = sessionStorage.getItem(LOADING_KEY);
+
+          // If previous page was in the middle of loading, we need a longer delay
+          // because the GPU is likely still processing the interrupted load
+          if (wasLoading) {
+            if (onProgress) onProgress('Waiting for GPU cleanup...');
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            sessionStorage.removeItem(LOADING_KEY);
+          } else if (unloadTime) {
+            const elapsed = Date.now() - parseInt(unloadTime, 10);
+            if (elapsed < 3000) {
+              if (onProgress) onProgress('Cleaning up previous session...');
+              const waitTime = Math.min(1500, Math.max(500, 1500 - elapsed));
+              await new Promise(resolve => setTimeout(resolve, waitTime));
+            }
+          }
+          sessionStorage.removeItem(UNLOAD_KEY);
+
+          // Mark that we're starting to load
+          sessionStorage.setItem(LOADING_KEY, Date.now().toString());
+        }
 
         const webgpuAvailable = await isWebGPUAvailable();
         let device = options.device || (webgpuAvailable ? 'webgpu' : 'wasm');
         let dtype = options.dtype || (webgpuAvailable ? INFERENCE_CONFIG.DEFAULT_QUANTIZATION : 'q8');
         this.dtype = dtype;
 
-        if (onProgress) onProgress(`Loading model with ${device} (${dtype})...`);
+        if (onProgress) onProgress(`Loading model (${device}, ${dtype}) and tokenizer...`);
 
         const sessionOptions = getSessionOptions(device, dtype);
 
-        try {
-          this.model = await AutoModelForVision2Seq.from_pretrained(INFERENCE_CONFIG.MODEL_ID, sessionOptions) as VisionEncoderDecoderModel;
-        } catch (loadError: any) {
-          // Check if this is a WebGPU buffer size / memory error
-          const isWebGPUMemoryError = loadError?.message?.includes('createBuffer') ||
-            loadError?.message?.includes('mappedAtCreation') ||
-            loadError?.message?.includes('too large for the implementation') ||
-            loadError?.message?.includes('GPUDevice');
+        // Load Tokenizer and Model in parallel
+        const [tokenizer, model] = await Promise.all([
+          AutoTokenizer.from_pretrained(INFERENCE_CONFIG.MODEL_ID),
+          (async () => {
+            try {
+              return await AutoModelForVision2Seq.from_pretrained(INFERENCE_CONFIG.MODEL_ID, sessionOptions) as VisionEncoderDecoderModel;
+            } catch (loadError: any) {
+              // Check if this is a WebGPU buffer size / memory error
+              const isWebGPUMemoryError = loadError?.message?.includes('createBuffer') ||
+                loadError?.message?.includes('mappedAtCreation') ||
+                loadError?.message?.includes('too large for the implementation') ||
+                loadError?.message?.includes('GPUDevice');
 
-          if (isWebGPUMemoryError && device === 'webgpu') {
-            console.warn('[InferenceService] WebGPU buffer allocation failed, falling back to WASM...');
-            if (onProgress) onProgress('WebGPU memory limit hit. Switching to WASM...');
+              if (isWebGPUMemoryError && device === 'webgpu') {
+                console.warn('[InferenceService] WebGPU buffer allocation failed, falling back to WASM...');
+                if (onProgress) onProgress('WebGPU memory limit hit. Switching to WASM...');
 
-            // Retry with WASM
-            device = 'wasm';
-            dtype = 'q8'; // Use quantized for WASM performance
-            this.dtype = dtype;
+                // Retry with WASM
+                device = 'wasm';
+                dtype = 'q8';
+                this.dtype = dtype;
 
-            const fallbackSessionOptions = getSessionOptions(device, dtype);
-            this.model = await AutoModelForVision2Seq.from_pretrained(INFERENCE_CONFIG.MODEL_ID, fallbackSessionOptions) as VisionEncoderDecoderModel;
-          } else {
-            throw loadError;
+                const fallbackSessionOptions = getSessionOptions(device, dtype);
+                return await AutoModelForVision2Seq.from_pretrained(INFERENCE_CONFIG.MODEL_ID, fallbackSessionOptions) as VisionEncoderDecoderModel;
+              } else {
+                throw loadError;
+              }
+            }
+          })()
+        ]);
+
+        // CHECK GENERATION AGAIN
+        if (this.disposalGeneration !== localGeneration) {
+          if (model && 'dispose' in model) {
+            await (model as any).dispose();
           }
+          return;
         }
+
+        this.tokenizer = tokenizer;
+        this.model = model;
+
+        // Clear loading flag - we're done
+        try {
+          sessionStorage.removeItem('__inktex_loading__');
+        } catch (e) { /* ignore */ }
 
         if (onProgress) onProgress('Ready');
       } catch (error) {
         console.error('Failed to load model:', error);
         throw error;
       }
-    })();
+    };
+
+    // Update the mutex - chain work onto it
+    this.loadingMutex = this.loadingMutex.then(work).catch(err => {
+      console.error("Error in initialization sequence:", err);
+    });
+
+    // initPromise should track this specific work
+    this.initPromise = this.loadingMutex;
 
     try {
       await this.initPromise;
@@ -106,9 +170,7 @@ export class InferenceService {
   private isProcessingQueue: boolean = false;
   private wakeQueuePromise: ((value: void) => void) | null = null;
 
-  // Timestamp when the pending request was created - used for grace period calculation
   private pendingRequestTimestamp: number = 0;
-  // Grace period timeout ID for the pending request
   private graceTimeoutId: ReturnType<typeof setTimeout> | null = null;
 
   private pendingRequest: {
@@ -122,18 +184,15 @@ export class InferenceService {
 
   public async infer(imageBlob: Blob, numCandidates: number = 1): Promise<InferenceResult> {
     return new Promise((resolve, reject) => {
-      // 1. If there's already a pending request, reject it (Skipped) - always keep only the latest
       if (this.pendingRequest) {
         this.pendingRequest.reject(new Error("Skipped"));
       }
 
-      // 2. Clear any existing grace timeout since we have a new request
       if (this.graceTimeoutId) {
         clearTimeout(this.graceTimeoutId);
         this.graceTimeoutId = null;
       }
 
-      // 3. Set new pending request with timestamp
       this.pendingRequest = {
         blob: imageBlob,
         numCandidates,
@@ -142,12 +201,9 @@ export class InferenceService {
       };
       this.pendingRequestTimestamp = Date.now();
 
-      // 4. If currently inferring, start the 3-second grace period timer immediately
-      //    This timer starts NOW, from when the user finished their stroke
       if (this.isInferring && this.abortController) {
         console.log('[InferenceService] New request while inferring. Starting 3s grace period from now...');
         this.graceTimeoutId = setTimeout(() => {
-          // Time's up - abort the current inference if it's still running
           if (this.isInferring && this.abortController) {
             console.warn('[InferenceService] 3s grace period expired. Aborting current inference.');
             this.abortController.abort();
@@ -156,13 +212,11 @@ export class InferenceService {
         }, InferenceService.GRACE_PERIOD_MS);
       }
 
-      // 5. Wake up the loop if it's waiting
       if (this.wakeQueuePromise) {
         this.wakeQueuePromise();
         this.wakeQueuePromise = null;
       }
 
-      // 6. Ensure queue processing is running
       if (!this.isProcessingQueue) {
         this.processQueue();
       }
@@ -174,34 +228,26 @@ export class InferenceService {
 
     try {
       while (this.pendingRequest) {
-        // If an inference is currently running, wait for it to complete or be aborted
-        // Note: The grace period timer is already running from when infer() was called
         if (this.currentInferencePromise && this.isInferring) {
           console.log('[InferenceService] Waiting for current inference to finish or abort...');
-          // Just wait - the grace timeout will handle aborting if needed
           try { await this.currentInferencePromise; } catch (e) { /* ignore */ }
         }
 
-        // Double check pendingRequest still exists
         if (!this.pendingRequest) break;
 
-        // Pop the request - take the LATEST one only
         const req = this.pendingRequest;
         this.pendingRequest = null;
         this.pendingRequestTimestamp = 0;
 
-        // Clear the grace timeout since we're now processing this request
         if (this.graceTimeoutId) {
           clearTimeout(this.graceTimeoutId);
           this.graceTimeoutId = null;
         }
 
-        // Start the inference
         this.isInferring = true;
         this.abortController = new AbortController();
         const signal = this.abortController.signal;
 
-        // Create a promise wrapper for this inference
         this.currentInferencePromise = (async () => {
           let pixelValues: Tensor | null = null;
           let debugImage: string = '';
@@ -258,7 +304,6 @@ export class InferenceService {
             this.abortController = null;
             this.currentInferencePromise = null;
 
-            // Wake up the loop if it was waiting for this inference to complete
             if (this.wakeQueuePromise) {
               this.wakeQueuePromise();
               this.wakeQueuePromise = null;
@@ -266,18 +311,13 @@ export class InferenceService {
           }
         })();
 
-        // Wait for this inference to complete OR for a new request to come in
         if (this.pendingRequest) {
-          // Immediately loop back - new request already waiting
           continue;
         } else {
-          // Wait for completion or new request
           await Promise.race([
             this.currentInferencePromise,
             new Promise<void>(resolve => { this.wakeQueuePromise = resolve; })
           ]);
-          // If woke up by new request, loop continues and hits the top 'if (pending)' block
-          // If woke up by completion, loop continues, checks pending, if null, breaks.
         }
       }
     } finally {
@@ -286,12 +326,8 @@ export class InferenceService {
   }
 
   private postprocess(latex: string): string {
-    // 1. Remove style (bold, italic, etc.) - optional but recommended for cleaner output
     let processed = removeStyle(latex);
-
-    // 2. Add newlines for readability
     processed = addNewlines(processed);
-
     return processed;
   }
 
@@ -301,23 +337,20 @@ export class InferenceService {
       return;
     }
 
-    // Force abort any running inference
+    // Increment generation to invalidate any pending inits
+    this.disposalGeneration++;
+
     if (this.abortController) {
       this.abortController.abort();
       this.abortController = null;
     }
 
-    // Reject any pending request
     if (this.pendingRequest) {
       this.pendingRequest.reject(new Error("Aborted"));
       this.pendingRequest = null;
     }
 
-    // If loading is in progress, we can't easily cancel the promise, but we can reset the state.
-    // Ideally we should await initPromise, but that might deadlock if dispose is called from within init (reconfig).
-    // For now, we assume dispose logic cleans up what it can.
-
-    this.isInferring = false; // Force reset state
+    this.isInferring = false;
 
     if (this.model) {
       if ('dispose' in this.model && typeof (this.model as any).dispose === 'function') {
@@ -330,13 +363,90 @@ export class InferenceService {
       this.model = null;
     }
     this.tokenizer = null;
+    this.initPromise = null;
+  }
 
-    // Important: Clear the instance so next getInstance creates a fresh one? 
-    // Or just keep the instance but empty?
-    // Following existing pattern of clearing instance.
-    (InferenceService as any).instance = null;
+  /**
+   * Synchronous disposal for use in beforeunload handlers.
+   * This fires and forgets the cleanup - doesn't wait for async operations.
+   */
+  public disposeSync(): void {
+    // Increment generation to invalidate any pending inits
+    this.disposalGeneration++;
+
+    // Abort any running inference immediately
+    if (this.abortController) {
+      this.abortController.abort();
+      this.abortController = null;
+    }
+
+    // Reject pending requests
+    if (this.pendingRequest) {
+      try {
+        this.pendingRequest.reject(new Error("Aborted"));
+      } catch (e) { /* ignore */ }
+      this.pendingRequest = null;
+    }
+
+    this.isInferring = false;
+
+    // Fire and forget the model disposal - don't await
+    if (this.model) {
+      const modelRef = this.model;
+      this.model = null;
+      if ('dispose' in modelRef && typeof (modelRef as any).dispose === 'function') {
+        // Trigger dispose but don't wait - browser is unloading
+        Promise.resolve().then(() => {
+          try {
+            (modelRef as any).dispose();
+          } catch (e) {
+            // Ignore - page is unloading anyway
+          }
+        });
+      }
+    }
+
+    this.tokenizer = null;
     this.initPromise = null;
   }
 }
 
-export const inferenceService = InferenceService.getInstance();
+// Use a global singleton stored on window to survive HMR and prevent duplicates
+declare global {
+  interface Window {
+    __inktex_inference_service__?: InferenceService;
+  }
+}
+
+function getOrCreateInstance(): InferenceService {
+  // In browser, use window-based singleton
+  if (typeof window !== 'undefined') {
+    if (!window.__inktex_inference_service__) {
+      window.__inktex_inference_service__ = new (InferenceService as any)();
+    }
+    return window.__inktex_inference_service__;
+  }
+  // Fallback for non-browser (SSR/tests)
+  return InferenceService.getInstance();
+}
+
+export const inferenceService = getOrCreateInstance();
+
+// Cleanup on page unload (F5 refresh, tab close, etc.)
+// Use disposeSync since beforeunload doesn't wait for async operations
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeunload', () => {
+    // Mark that we're unloading so the next init can add a delay
+    try {
+      sessionStorage.setItem('__inktex_unloading__', Date.now().toString());
+    } catch (e) { /* ignore storage errors */ }
+    getOrCreateInstance().disposeSync();
+  });
+}
+
+// HMR Cleanup - dispose the model when this module is hot-reloaded
+if ((import.meta as any).hot) {
+  (import.meta as any).hot.dispose(() => {
+    getOrCreateInstance().dispose(true);
+  });
+}

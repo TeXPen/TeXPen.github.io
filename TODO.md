@@ -5,11 +5,10 @@ Bugs
 Behavior
 
 Features
-- [ ] Add favicon
 
 Visuals
-- [ ] What is the bottom right corner in history entries
-- [ ] Improve history entry UI
+- [x] Improve history entry UI
+- [ ] Add icons to draw/upload tab buttons
 
 Maintenance
 - [ ] refactor and add tests

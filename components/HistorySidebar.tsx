@@ -81,8 +81,6 @@ const MathHistoryItem: React.FC<{ latex: string }> = ({ latex }) => {
             >
                 {`\\(${cleanLatex}\\)`}
             </div>
-            {/* Gradient overlay - adjusts to height */}
-            <div className="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white dark:from-[#0c0c0c] to-transparent pointer-events-none rounded-r-xl" />
         </div>
     );
 };
@@ -315,6 +313,17 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
                                             </button>
                                         )}
                                     </div>
+
+                                    {/* Image Preview for Uploads */}
+                                    {item.source === 'upload' && item.imageData && (
+                                        <div className="mb-2 mt-1 w-full flex justify-center bg-black/5 dark:bg-white/5 rounded-lg overflow-hidden py-1">
+                                            <img
+                                                src={item.imageData}
+                                                alt="Source"
+                                                className="h-16 object-contain rounded-md"
+                                            />
+                                        </div>
+                                    )}
 
                                     {/* USE SCALABLE COMPONENT */}
                                     <MathHistoryItem latex={item.latex} />

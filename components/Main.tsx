@@ -103,15 +103,45 @@ const Main: React.FC = () => {
         setShowUploadResult(false);
     };
 
+    // Convert Blob URL to Base64
+    const blobUrlToBase64 = async (url: string): Promise<string> => {
+        const response = await fetch(url);
+        const blob = await response.blob();
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result as string);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+        });
+    };
+
     const handleUploadConvert = async () => {
         if (!uploadPreview) return;
         const result = await inferFromUrl(uploadPreview);
         if (result) {
-            addToHistory({ id: Date.now().toString(), latex: result.latex, timestamp: Date.now(), source: 'upload', sessionId });
+            // Save image data to history
+            const base64Image = await blobUrlToBase64(uploadPreview);
+            addToHistory({
+                id: Date.now().toString(),
+                latex: result.latex,
+                timestamp: Date.now(),
+                source: 'upload',
+                sessionId,
+                imageData: base64Image
+            });
             // Don't clear preview immediately, keep it for context or clear if preferred.
             // User flow: Convert -> Show Result.
             setShowUploadResult(true);
         }
+    };
+
+    const handleHistorySelect = (item: any) => {
+        if (item.source === 'upload' && item.imageData) {
+            setUploadPreview(item.imageData);
+            setShowUploadResult(true);
+            setActiveTab('upload');
+        }
+        loadFromHistory(item);
     };
 
     const handleUploadAnother = () => {
@@ -166,7 +196,7 @@ const Main: React.FC = () => {
                 <div className="flex-1 flex min-h-0 relative">
                     <HistorySidebar
                         history={history}
-                        onSelect={loadFromHistory}
+                        onSelect={handleHistorySelect}
                         onDelete={deleteHistoryItem}
                         onClearAll={clearHistory}
                         isOpen={isSidebarOpen}

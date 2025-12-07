@@ -30,6 +30,7 @@ export interface HistoryItem {
   latex: string;
   timestamp: number;
   source?: 'draw' | 'upload';
+  imageData?: string; // Data URL for uploaded images
   versions?: HistoryItem[];
 }
 

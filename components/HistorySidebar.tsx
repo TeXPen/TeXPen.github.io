@@ -153,26 +153,30 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
     const customStyles: StylesConfig = {
         control: (provided) => ({
             ...provided,
-            width: '100%',
-            height: 28,
-            minHeight: 28,
-            backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgb(255, 255, 255)',
+            width: 'auto',
+            minWidth: '120px',
+            backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)',
             border: `1px solid ${theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
-            borderRadius: '0.375rem',
+            borderRadius: '0.5rem',
             boxShadow: 'none',
+            cursor: 'pointer',
+            padding: '2px 8px',
+            minHeight: 'auto',
+            display: 'flex',
+            alignItems: 'center',
             '&:hover': {
-                borderColor: theme === 'dark' ? 'rgb(34 211 238)' : 'rgb(6 182 212)',
+                backgroundColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.08)',
+                borderColor: theme === 'dark' ? 'rgba(255, 255, 255, 0.2)' : 'rgba(0, 0, 0, 0.2)',
             },
         }),
         valueContainer: (provided) => ({
             ...provided,
-            height: '28px',
-            padding: '0 8px',
+            padding: '0 4px 0 0',
+            margin: 0,
         }),
         input: (provided) => ({
             ...provided,
             margin: '0px',
-            height: '28px',
             color: theme === 'dark' ? 'white' : 'black',
         }),
         indicatorSeparator: () => ({
@@ -180,32 +184,43 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
         }),
         indicatorsContainer: (provided) => ({
             ...provided,
-            height: '28px',
+            height: 'auto',
+            padding: 0,
+        }),
+        dropdownIndicator: (provided) => ({
+            ...provided,
+            padding: 0,
+            color: theme === 'dark' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(0, 0, 0, 0.4)',
         }),
         singleValue: (provided) => ({
             ...provided,
-            color: theme === 'dark' ? 'white' : '#1f2937',
+            color: theme === 'dark' ? 'rgba(255, 255, 255, 0.6)' : 'rgba(0, 0, 0, 0.6)',
             fontSize: '0.75rem',
-            fontFamily: 'monospace', // Matching settings font if generalized, or keeping sidebar aesthetic? Provider used monospace. Let's use sans for history for readability or inherit. ProviderSelector used monospace. I'll stick to default sans for history labels as they are text.
-            // Actually ProviderSelector uses monospace because it shows code-like enum values (webgpu). History labels are UI text. I will remove fontFamily monospace.
+            fontWeight: 600,
+            textTransform: 'uppercase',
+            letterSpacing: '0.05em',
+            margin: 0,
         }),
         menu: (provided) => ({
             ...provided,
-            backgroundColor: theme === 'dark' ? '#111' : 'white',
+            backgroundColor: theme === 'dark' ? '#1a1a1a' : 'white',
             border: `1px solid ${theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)'}`,
-            borderRadius: '0.5rem',
+            borderRadius: '0.75rem',
+            boxShadow: '0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05)',
             zIndex: 50,
+            overflow: 'hidden',
         }),
         option: (provided, { isSelected, isFocused }) => ({
             ...provided,
             backgroundColor: isSelected
                 ? (theme === 'dark' ? 'rgb(6 182 212)' : 'rgb(6 182 212)')
                 : isFocused
-                    ? (theme === 'dark' ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)')
+                    ? (theme === 'dark' ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)')
                     : 'transparent',
-            color: isSelected ? 'white' : (theme === 'dark' ? 'white' : '#1f2937'),
+            color: isSelected ? 'white' : (theme === 'dark' ? 'rgba(255, 255, 255, 0.8)' : '#1f2937'),
             fontSize: '0.875rem',
             cursor: 'pointer',
+            padding: '8px 12px',
         }),
     };
 
@@ -232,31 +247,29 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
                     </div>
 
                     {/* Title (Hidden when closed) */}
-                    <div className={`flex-1 flex justify-between items-center pr-4 transition-opacity duration-200 ${isOpen ? 'opacity-100 delay-75' : 'opacity-0'} whitespace-nowrap overflow-hidden`}>
-                        <>
-                            <span className="text-xs font-semibold text-slate-500 dark:text-white/40 uppercase tracking-wider">History</span>
-                            <span className="text-[10px] text-slate-400 dark:text-white/20">{filteredHistory.length}</span>
-                        </>
-
-
+                    <div className={`flex-1 flex flex-col justify-center pr-4 transition-opacity duration-200 ${isOpen ? 'opacity-100 delay-75' : 'opacity-0'} whitespace-nowrap overflow-hidden`}>
+                        {/* New Minimal Filter Dropdown Location */}
+                        <div className="w-full">
+                            <Select
+                                value={filterOptions.find(o => o.value === filterMode)}
+                                onChange={(option: { value: string; label: string } | null) => setFilterMode((option?.value as 'all' | 'current') || 'all')}
+                                options={filterOptions}
+                                styles={{
+                                    ...customStyles,
+                                    menuPortal: (base) => ({ ...base, zIndex: 9999 })
+                                }}
+                                isSearchable={false}
+                                menuPlacement="auto"
+                                menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
+                                components={{
+                                    IndicatorSeparator: () => null,
+                                }}
+                            />
+                        </div>
                     </div>
                 </div>
 
-                {/* Filter Dropdown */}
-                <div className={`px-4 pb-4 transition-all duration-300 ${isOpen ? 'opacity-100 h-auto' : 'opacity-0 h-0 pointer-events-none'}`}>
-                    <Select
-                        value={filterOptions.find(o => o.value === filterMode)}
-                        onChange={(option: { value: string; label: string } | null) => setFilterMode((option?.value as 'all' | 'current') || 'all')}
-                        options={filterOptions}
-                        styles={{
-                            ...customStyles,
-                            menuPortal: (base) => ({ ...base, zIndex: 9999 })
-                        }}
-                        isSearchable={false}
-                        menuPlacement="auto"
-                        menuPortalTarget={typeof document !== 'undefined' ? document.body : null}
-                    />
-                </div>
+                {/* Removed separate div for dropdown, now integrated in header */}
             </div>
 
             {/* List */}
@@ -272,7 +285,7 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
                             return (
                                 <div
                                     key={item.id}
-                                    className="group relative p-3 rounded-xl bg-black/[0.02] dark:bg-white/[0.02] hover:bg-black/[0.05] dark:hover:bg-white/[0.05] border border-black/5 dark:border-white/10 transition-all cursor-pointer"
+                                    className="group relative p-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 border border-black/5 dark:border-white/10 transition-all cursor-pointer"
                                     onClick={() => onSelect(item)}
                                 >
                                     <div className="flex items-center justify-between mb-1 whitespace-nowrap overflow-hidden">

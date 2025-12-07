@@ -1,6 +1,7 @@
 Priority
 
 Bugs
+- [ ] Flashes to light theme before dark theme
 
 Behavior
 

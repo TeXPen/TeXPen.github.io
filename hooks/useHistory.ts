@@ -28,16 +28,11 @@ export const useHistory = () => {
       // we update the recent item instead of creating a new one.
       if (prev.length > 0 && prev[0].sessionId === item.sessionId) {
         const existingItem = prev[0];
-        // Create a snapshot of the current state (the "new" version becomes the latest)
-        // We want to keep a history of all versions.
-        // Let's interpret "versions" as: [oldest, ..., newest] or [newest, ..., oldest]?
-        // Let's store them chronologically: [version 1, version 2, ...].
-        // Actually, maybe it's better to verify what the user wants.
-        // "Dropdown of stroke history".
 
-        // Logic:
-        // 1. The main item always shows the LATEST state (so the list looks like the final result).
-        // 2. The `versions` array accumulates every state that led here.
+        // Prevent duplicate versions if the output hasn't changed
+        if (existingItem.latex === item.latex) {
+          return prev;
+        }
 
         const previousVersions = existingItem.versions || [];
         // Add the *current* state of the item (before this update) to versions? 

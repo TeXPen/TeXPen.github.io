@@ -31,6 +31,14 @@ if (typeof window === 'undefined') {
     removeItem: (key: string) => { },
     clear: () => { }
   };
+  (global as any).localStorage = {
+    _data: {} as Record<string, string>,
+    getItem: function (key: string) { return this._data[key] || null; },
+    setItem: function (key: string, value: string) { this._data[key] = value; },
+    removeItem: function (key: string) { delete this._data[key]; },
+    clear: function () { this._data = {}; }
+  };
+  (global as any).window.localStorage = (global as any).localStorage;
 }
 
 if (typeof document === 'undefined') {

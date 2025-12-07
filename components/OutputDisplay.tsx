@@ -33,21 +33,23 @@ const OutputDisplay: React.FC<OutputDisplayProps> = ({ latex, isInferencing = fa
 
     return (
         <div className="h-[30%] md:h-[35%] relative flex flex-col items-center justify-center bg-gradient-to-b from-white/[0.2] dark:from-white/[0.02] to-transparent z-10">
-            <div id="latex-output" className="w-full text-center text-2xl md:text-5xl text-slate-800 dark:text-white px-8 py-4 overflow-x-auto overflow-y-auto scrollbar-thin flex items-center justify-center h-full">
-                {isInferencing ? (
-                    <div className="flex items-center justify-center gap-3 text-blue-500 dark:text-blue-400">
-                        {/* Animated spinner */}
-                        <div className="relative w-6 h-6">
-                            <div className="absolute inset-0 border-2 border-blue-500/30 dark:border-blue-400/30 rounded-full"></div>
-                            <div className="absolute inset-0 border-2 border-blue-500 dark:border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+            <div className="w-full h-full overflow-x-auto overflow-y-auto scrollbar-thin flex relative">
+                <div id="latex-output" className="m-auto text-center text-2xl md:text-5xl text-slate-800 dark:text-white px-8 py-4 leading-relaxed">
+                    {isInferencing ? (
+                        <div className="flex items-center justify-center gap-3 text-blue-500 dark:text-blue-400">
+                            {/* Animated spinner */}
+                            <div className="relative w-6 h-6">
+                                <div className="absolute inset-0 border-2 border-blue-500/30 dark:border-blue-400/30 rounded-full"></div>
+                                <div className="absolute inset-0 border-2 border-blue-500 dark:border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                            </div>
+                            <span className="font-medium text-lg animate-pulse">Generating LaTeX...</span>
                         </div>
-                        <span className="font-medium text-lg animate-pulse">Generating LaTeX...</span>
-                    </div>
-                ) : latex ? (
-                    `\\[${sanitizeLatex(latex)}\\]`
-                ) : (
-                    <span className="text-slate-300 dark:text-white/10 font-light italic text-xl">Equation preview...</span>
-                )}
+                    ) : latex ? (
+                        `\\[${sanitizeLatex(latex)}\\]`
+                    ) : (
+                        <span className="text-slate-300 dark:text-white/10 font-light italic text-xl">Equation preview...</span>
+                    )}
+                </div>
             </div>
 
             {/* ... existing Action Bar code ... */}

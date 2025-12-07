@@ -62,7 +62,7 @@ const ImageUploadArea: React.FC<ImageUploadAreaProps> = ({
             {!previewUrl ? (
                 <div
                     className={`
-                        w-full h-full border-4 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all duration-300
+                        w-full h-full max-w-4xl border-4 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all duration-300
                         ${isDragging
                             ? 'border-cyan-500 bg-cyan-50/10 dark:bg-cyan-900/10 scale-[0.99]'
                             : 'border-black/10 dark:border-white/10 hover:border-cyan-400 dark:hover:border-cyan-600 hover:bg-black/5 dark:hover:bg-white/5'

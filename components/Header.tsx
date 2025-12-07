@@ -14,7 +14,7 @@ const Header: React.FC = () => {
     } = useAppContext();
 
     return (
-        <div className="h-16 flex-none flex items-center justify-between px-6 border-b border-black/5 dark:border-white/5 bg-white/40 dark:bg-black/20 select-none z-30 backdrop-blur-md">
+        <div className="relative h-16 flex-none flex items-center justify-between px-6 border-b border-black/5 dark:border-white/5 bg-white/40 dark:bg-black/20 select-none z-30 backdrop-blur-md">
 
             {/* Left: Logo */}
             <div className="flex items-center gap-3 group">
@@ -92,8 +92,8 @@ const Header: React.FC = () => {
                             {/* Tooltip */}
                             <div className="absolute top-full right-0 mt-2 w-48 p-2 bg-white dark:bg-[#111] border border-black/10 dark:border-white/10 rounded-lg shadow-xl backdrop-blur-xl z-50 opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible transition-all duration-200 text-left pointer-events-none">
                                 <p className="text-[10px] text-slate-500 dark:text-white/60 leading-tight">
-                                    <span className="font-bold text-cyan-600 dark:text-cyan-400">1 Candidate:</span> Fast (Greedy)<br />
-                                    <span className="font-bold text-purple-600 dark:text-purple-400">2-5 Candidates:</span> Slower (Beam Search)
+                                    <span className="font-bold text-cyan-600 dark:text-cyan-400">1 Candidate:</span> Greedy<br />
+                                    <span className="font-bold text-purple-600 dark:text-purple-400">2-5 Candidates:</span> Beam Search
                                 </p>
                             </div>
                         </div>

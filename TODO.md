@@ -1,11 +1,11 @@
 Priority
 
 Bugs
-- [ ] Upload tab button too low
-- [ ] Multiline equations overflowing
+- [x] Upload tab button too low
+- [x] Multiline equations overflowing
 
 Behavior
-- [ ] Update `candidates` description for inference (beam search has ≈equal speed to greedy now)
+- [x] Update `candidates` description for inference (beam search has ≈equal speed to greedy now)
 
 Features
 

@@ -88,7 +88,7 @@ const Main: React.FC = () => {
     );
 
     return (
-        <div className="relative h-screen w-screen overflow-hidden font-sans bg-[#fafafa] dark:bg-black transition-colors duration-500 flex flex-row">
+        <div className="relative h-screen w-full overflow-hidden font-sans bg-[#fafafa] dark:bg-black transition-colors duration-500 flex flex-row">
             <LiquidBackground />
 
             {/* Global glass background wrapper */}
@@ -129,11 +129,9 @@ const Main: React.FC = () => {
                                 {status === 'loading' && userConfirmed && renderLoadingOverlay()}
                             </div>
 
-                            {/* Upload Mode */}
                             {activeTab === 'upload' && (
-                                <div className="absolute inset-0 z-10 bg-transparent animate-in fade-in zoom-in-95 duration-200 p-6 flex flex-col">
-                                    <h2 className="text-xl font-bold mb-6 text-slate-800 dark:text-white px-2">Upload Image</h2>
-                                    <div className="flex-1 bg-white/50 dark:bg-black/20 rounded-2xl border border-black/5 dark:border-white/5 overflow-hidden backdrop-blur-sm">
+                                <div className="absolute inset-0 z-10 bg-transparent animate-in fade-in zoom-in-95 duration-200 p-4 flex flex-col overflow-hidden">
+                                    <div className="flex-1 bg-white/50 dark:bg-black/20 rounded-2xl overflow-hidden backdrop-blur-sm w-full h-full">
                                         <ImageUploadArea
                                             onImageSelect={handleImageSelect}
                                             onConvert={handleUploadConvert}

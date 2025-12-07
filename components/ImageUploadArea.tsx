@@ -42,14 +42,29 @@ const ImageUploadArea: React.FC<ImageUploadAreaProps> = ({
         }
     };
 
+    React.useEffect(() => {
+        const handlePaste = (e: ClipboardEvent) => {
+            if (e.clipboardData && e.clipboardData.files.length > 0) {
+                const file = e.clipboardData.files[0];
+                if (file.type.startsWith('image/')) {
+                    e.preventDefault();
+                    onImageSelect(file);
+                }
+            }
+        };
+
+        window.addEventListener('paste', handlePaste);
+        return () => window.removeEventListener('paste', handlePaste);
+    }, [onImageSelect]);
+
     return (
-        <div className="flex-1 flex flex-col items-center justify-center p-8 bg-transparent">
+        <div className="flex-1 flex flex-col items-center justify-center p-2 bg-transparent w-full h-full">
             {!previewUrl ? (
                 <div
                     className={`
-                        w-full max-w-xl h-96 border-4 border-dashed rounded-3xl flex flex-col items-center justify-center cursor-pointer transition-all duration-300
+                        w-full h-full border-4 border-dashed rounded-xl flex flex-col items-center justify-center cursor-pointer transition-all duration-300
                         ${isDragging
-                            ? 'border-cyan-500 bg-cyan-50/10 dark:bg-cyan-900/10 scale-[1.02]'
+                            ? 'border-cyan-500 bg-cyan-50/10 dark:bg-cyan-900/10 scale-[0.99]'
                             : 'border-black/10 dark:border-white/10 hover:border-cyan-400 dark:hover:border-cyan-600 hover:bg-black/5 dark:hover:bg-white/5'
                         }
                     `}

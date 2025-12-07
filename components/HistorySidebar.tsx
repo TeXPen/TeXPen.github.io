@@ -375,9 +375,9 @@ const HistorySidebar: React.FC<HistorySidebarProps> = ({
                 {filteredHistory.length > 0 && (
                     <button
                         onClick={handleClearClick}
-                        className="w-full py-2 px-3 rounded-lg text-xs font-medium text-slate-500 dark:text-white/40 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center justify-center gap-2 group/clear"
+                        className="w-full py-2 px-3 rounded-lg text-xs font-medium text-slate-500 dark:text-white/40 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/10 transition-colors flex items-center justify-center gap-2 group/clear whitespace-nowrap"
                     >
-                        <TrashIcon />
+                        <span className="shrink-0"><TrashIcon /></span>
                         <span>Clear All History</span>
                     </button>
                 )}

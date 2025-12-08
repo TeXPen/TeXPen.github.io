@@ -26,6 +26,7 @@ export interface InferenceResult {
 export interface InferenceOptions {
   dtype?: string;
   device?: 'webgpu' | 'wasm' | 'webgl';
+  modelId?: string;
 }
 
 export interface Beam {

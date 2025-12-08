@@ -30,6 +30,11 @@ export interface AppContextType {
     progress: number;
     userConfirmed: boolean;
     setUserConfirmed: (confirmed: boolean) => void;
+
+    // Custom Model
+    customModelId: string;
+    setCustomModelId: (id: string) => void;
+
     isLoadedFromCache: boolean;
     showVisualDebugger: boolean;
     setShowVisualDebugger: (show: boolean) => void;
@@ -61,6 +66,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const { theme } = useThemeContext();
     const [quantization, setQuantization] = useState<string>(INFERENCE_CONFIG.DEFAULT_QUANTIZATION);
     const [provider, setProvider] = useState<Provider>(INFERENCE_CONFIG.DEFAULT_PROVIDER as Provider);
+    const [customModelId, setCustomModelId] = useState<string>(INFERENCE_CONFIG.MODEL_ID);
     const [activeTab, setActiveTab] = useState<'draw' | 'upload'>('draw');
 
     useEffect(() => {
@@ -90,7 +96,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         userConfirmed,
         setUserConfirmed,
         isLoadedFromCache,
-    } = useInkModel(theme, quantization, provider);
+    } = useInkModel(theme, quantization, provider, customModelId);
 
     const [selectedIndex, setSelectedIndex] = useState<number>(0);
     const [isSidebarOpen, setIsSidebarOpen] = useState(true);
@@ -143,6 +149,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         progress,
         userConfirmed,
         setUserConfirmed,
+        customModelId,
+        setCustomModelId,
         isLoadedFromCache,
         showVisualDebugger,
         setShowVisualDebugger,

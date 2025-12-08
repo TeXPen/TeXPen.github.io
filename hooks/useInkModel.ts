@@ -4,7 +4,7 @@ import { inferenceService } from '../services/inference/InferenceService';
 
 import { INFERENCE_CONFIG } from '../services/inference/config';
 
-export function useInkModel(theme: 'light' | 'dark', quantization: string = INFERENCE_CONFIG.DEFAULT_QUANTIZATION, provider: 'webgpu' | 'wasm' | 'webgl') {
+export function useInkModel(theme: 'light' | 'dark', quantization: string = INFERENCE_CONFIG.DEFAULT_QUANTIZATION, provider: 'webgpu' | 'wasm' | 'webgl', customModelId: string = INFERENCE_CONFIG.MODEL_ID) {
   const [numCandidates, setNumCandidates] = useState<number>(1);
   const [config, setConfig] = useState<ModelConfig>({
     encoderModelUrl: 'onnx-community/TexTeller3-ONNX',
@@ -60,7 +60,7 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = INFE
   }, [config.encoderModelUrl]);
 
   // Track previous settings to detect actual changes vs StrictMode re-runs
-  const prevSettingsRef = useRef<{ quantization: string; provider: string } | null>(null);
+  const prevSettingsRef = useRef<{ quantization: string; provider: string; modelId: string } | null>(null);
 
   // Initialize model on mount, dispose on unmount or settings change
   useEffect(() => {
@@ -86,13 +86,13 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = INFE
           if (progress !== undefined) {
             setProgress(progress);
           }
-        }, { dtype: quantization, device: provider });
+        }, { dtype: quantization, device: provider, modelId: customModelId });
 
         if (!isCancelled) {
           setStatus('idle');
           setLoadingPhase('');
           // Track that we successfully loaded with these settings
-          prevSettingsRef.current = { quantization, provider };
+          prevSettingsRef.current = { quantization, provider, modelId: customModelId };
         }
       } catch (error) {
         if (isCancelled) return; // Ignore errors if cancelled
@@ -113,7 +113,8 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = INFE
       // The InferenceService singleton will reuse the existing model
       const settingsChanged = prevSettingsRef.current &&
         (prevSettingsRef.current.quantization !== quantization ||
-          prevSettingsRef.current.provider !== provider);
+          prevSettingsRef.current.provider !== provider ||
+          prevSettingsRef.current.modelId !== customModelId);
 
       if (settingsChanged && userConfirmed) {
         console.log('[useInkModel] Settings changed, disposing model...');
@@ -122,7 +123,7 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = INFE
         });
       }
     };
-  }, [quantization, provider, userConfirmed, isLoadedFromCache]);
+  }, [quantization, provider, customModelId, userConfirmed, isLoadedFromCache]);
 
   // Note: beforeunload cleanup is now handled directly in InferenceService.ts
 

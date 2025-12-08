@@ -12,6 +12,7 @@ export class InferenceService {
   private static instance: InferenceService;
   private isInferring: boolean = false;
   private dtype: string = INFERENCE_CONFIG.DEFAULT_QUANTIZATION;
+  private currentModelId: string = INFERENCE_CONFIG.MODEL_ID;
   private initPromise: Promise<void> | null = null;
 
   private constructor() { }
@@ -35,11 +36,13 @@ export class InferenceService {
     // Append our actual work to the mutex chain
     const work = async () => {
       const localGeneration = this.disposalGeneration;
+      // console.log('[DEBUG] Entering work. model:', !!this.model, 'currentModelId:', this.currentModelId, 'optId:', options.modelId);
 
       if (this.model && this.tokenizer) {
         // If the model is already loaded, but the quantization or device is different, we need to dispose and reload.
         if ((options.dtype && (this.model as any).config.dtype !== options.dtype) ||
-          (options.device && (this.model as any).config.device !== options.device)) {
+          (options.device && (this.model as any).config.device !== options.device) ||
+          (options.modelId && this.currentModelId !== options.modelId)) {
 
           if (this.isInferring) {
             console.warn("Changing model settings while inference is in progress.");
@@ -50,7 +53,7 @@ export class InferenceService {
             return;
           }
         } else {
-          // Already loaded with correct settings
+          // Already loaded with correct settings (including model ID)
           return;
         }
       }
@@ -90,18 +93,23 @@ export class InferenceService {
         const webgpuAvailable = await isWebGPUAvailable();
         let device = options.device || (webgpuAvailable ? 'webgpu' : 'wasm');
         let dtype = options.dtype || (webgpuAvailable ? INFERENCE_CONFIG.DEFAULT_QUANTIZATION : 'q8');
+        // Update current ID if provided, otherwise keep existing (or default on first run)
+        if (options.modelId) {
+          this.currentModelId = options.modelId;
+        }
+
         this.dtype = dtype;
 
-        if (onProgress) onProgress(`Loading model (${device}, ${dtype}) and tokenizer...`);
+        if (onProgress) onProgress(`Loading model ${this.currentModelId} (${device}, ${dtype})...`);
 
         const sessionOptions = getSessionOptions(device, dtype);
 
         // Load Tokenizer and Model in parallel
         const [tokenizer, model] = await Promise.all([
-          AutoTokenizer.from_pretrained(INFERENCE_CONFIG.MODEL_ID),
+          AutoTokenizer.from_pretrained(this.currentModelId),
           (async () => {
             try {
-              return await AutoModelForVision2Seq.from_pretrained(INFERENCE_CONFIG.MODEL_ID, sessionOptions) as VisionEncoderDecoderModel;
+              return await AutoModelForVision2Seq.from_pretrained(this.currentModelId, sessionOptions) as VisionEncoderDecoderModel;
             } catch (loadError: any) {
               // Check if this is a WebGPU buffer size / memory error
               const isWebGPUMemoryError = loadError?.message?.includes('createBuffer') ||
@@ -119,7 +127,7 @@ export class InferenceService {
                 this.dtype = dtype;
 
                 const fallbackSessionOptions = getSessionOptions(device, dtype);
-                return await AutoModelForVision2Seq.from_pretrained(INFERENCE_CONFIG.MODEL_ID, fallbackSessionOptions) as VisionEncoderDecoderModel;
+                return await AutoModelForVision2Seq.from_pretrained(this.currentModelId, fallbackSessionOptions) as VisionEncoderDecoderModel;
               } else {
                 throw loadError;
               }

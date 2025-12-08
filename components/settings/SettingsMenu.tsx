@@ -15,6 +15,8 @@ export const SettingsMenu: React.FC = () => {
         setProvider,
         showVisualDebugger,
         setShowVisualDebugger,
+        customModelId,
+        setCustomModelId,
     } = useAppContext();
     const { theme, toggleTheme } = useThemeContext();
     const { filterMode, setFilterMode } = useHistoryContext();
@@ -89,6 +91,29 @@ export const SettingsMenu: React.FC = () => {
                     <div className="p-3">
                         <div className="text-xs font-bold uppercase text-slate-400 dark:text-white/40 mb-2">Quantization</div>
                         <QuantizationSelector value={quantization} onChange={setQuantization} />
+                    </div>
+
+                    <div className="h-px bg-black/5 dark:bg-white/5 mx-2" />
+
+                    {/* Model ID */}
+                    <div className="p-3">
+                        <div className="text-xs font-bold uppercase text-slate-400 dark:text-white/40 mb-2">HuggingFace Model ID</div>
+                        <input
+                            type="text"
+                            defaultValue={customModelId}
+                            onBlur={(e) => {
+                                if (e.target.value !== customModelId) {
+                                    setCustomModelId(e.target.value);
+                                }
+                            }}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                    e.currentTarget.blur();
+                                }
+                            }}
+                            className="w-full text-xs font-mono bg-black/5 dark:bg-white/5 rounded-lg border border-black/10 dark:border-white/10 px-2 py-1.5 focus:outline-none focus:border-cyan-500 dark:focus:border-cyan-400 text-slate-700 dark:text-white transition-all"
+                            placeholder="user/repo"
+                        />
                     </div>
 
                     <div className="h-px bg-black/5 dark:bg-white/5 mx-2" />

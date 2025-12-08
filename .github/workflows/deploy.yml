@@ -19,7 +19,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: inktex
+        working-directory: .
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -29,7 +29,7 @@ jobs:
         with:
           node-version: 24
           cache: "npm"
-          cache-dependency-path: inktex/package-lock.json
+          cache-dependency-path: package-lock.json
 
       - name: Install dependencies
         run: npm ci
@@ -40,7 +40,7 @@ jobs:
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v4
         with:
-          path: inktex/dist
+          path: dist
 
   deploy:
     needs: build

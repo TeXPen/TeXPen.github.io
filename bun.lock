@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "inktex",
+      "name": "texpen",
       "dependencies": {
         "@huggingface/transformers": "^3.8.1",
         "@napi-rs/canvas": "^0.1.83",
@@ -11,8 +11,8 @@
         "@types/react-select": "^5.0.1",
         "idb": "^8.0.3",
         "onnxruntime-web": "^1.23.2",
-        "react": "^19.2.0",
-        "react-dom": "^19.2.0",
+        "react": "^19.2.1",
+        "react-dom": "^19.2.1",
         "react-select": "^5.10.2",
         "tokenizers": "^0.13.3",
       },

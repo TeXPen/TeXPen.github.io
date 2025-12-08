@@ -5,7 +5,7 @@ export const useHistory = () => {
   const [history, setHistory] = useState<HistoryItem[]>(() => {
     if (typeof window === 'undefined') return [];
     try {
-      const item = window.localStorage.getItem('inktex_history');
+      const item = window.localStorage.getItem('texpen_history');
       return item ? JSON.parse(item) : [];
     } catch (error) {
       console.warn('Failed to load history from localStorage:', error);
@@ -15,7 +15,7 @@ export const useHistory = () => {
 
   useEffect(() => {
     try {
-      window.localStorage.setItem('inktex_history', JSON.stringify(history));
+      window.localStorage.setItem('texpen_history', JSON.stringify(history));
     } catch (error) {
       console.warn('Failed to save history to localStorage:', error);
     }

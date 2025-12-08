@@ -63,8 +63,8 @@ export class InferenceService {
         if (this.disposalGeneration !== localGeneration) return;
 
         // Check if we just refreshed OR a previous load was interrupted
-        const UNLOAD_KEY = '__inktex_unloading__';
-        const LOADING_KEY = '__inktex_loading__';
+        const UNLOAD_KEY = '__texpen_unloading__';
+        const LOADING_KEY = '__texpen_loading__';
 
         if (typeof sessionStorage !== 'undefined') {
           const unloadTime = sessionStorage.getItem(UNLOAD_KEY);
@@ -148,7 +148,7 @@ export class InferenceService {
 
         // Clear loading flag - we're done
         try {
-          sessionStorage.removeItem('__inktex_loading__');
+          sessionStorage.removeItem('__texpen_loading__');
         } catch (e) { /* ignore */ }
 
         if (onProgress) onProgress('Ready');
@@ -422,17 +422,17 @@ export class InferenceService {
 // Use a global singleton stored on window to survive HMR and prevent duplicates
 declare global {
   interface Window {
-    __inktex_inference_service__?: InferenceService;
+    __texpen_inference_service__?: InferenceService;
   }
 }
 
 function getOrCreateInstance(): InferenceService {
   // In browser, use window-based singleton
   if (typeof window !== 'undefined') {
-    if (!window.__inktex_inference_service__) {
-      window.__inktex_inference_service__ = new (InferenceService as any)();
+    if (!window.__texpen_inference_service__) {
+      window.__texpen_inference_service__ = new (InferenceService as any)();
     }
-    return window.__inktex_inference_service__;
+    return window.__texpen_inference_service__;
   }
   // Fallback for non-browser (SSR/tests)
   return InferenceService.getInstance();
@@ -446,7 +446,7 @@ if (typeof window !== 'undefined') {
   window.addEventListener('beforeunload', () => {
     // Mark that we're unloading so the next init can add a delay
     try {
-      sessionStorage.setItem('__inktex_unloading__', Date.now().toString());
+      sessionStorage.setItem('__texpen_unloading__', Date.now().toString());
     } catch (e) { /* ignore storage errors */ }
     getOrCreateInstance().disposeSync();
   });

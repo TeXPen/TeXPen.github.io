@@ -6,29 +6,37 @@
 - Clipboard contains only test image
 
 ## Drawing Tab
+
+### Basic
+
 1. Draw: integral $\int_{a}^{b} f(x) \, dx$
 2. Clear
-3. Draw: Euler's identity $e^{i\pi} + 1 = 0$
-4. Draw: LHS /2 $\frac{e^{i\pi} + 1}{2} = 0$
-5. Open history versioning dropdown
-6. Erase /2, back to: $e^{i\pi} + 1 = 0$, then undo
-7. Clear
-8. Change candidates to 3
-9. Draw: $\mathbb{E}[X]+1$
 
-- Collapse/expand history sidebar
+### History, Eraser And Undo
+
+1. Draw: Euler's identity $e^{i\pi} + 1 = 0$
+2. Draw: LHS /2 $\frac{e^{i\pi} + 1}{2} = 0$
+3. Open history versioning dropdown
+4. Erase /2, back to: $e^{i\pi} + 1 = 0$
+5. Undo button
+6. Clear
+
+### Candidates
+
+1. Change candidates to 3
+2. Draw: $\mathbb{E}[X]+1$
 
 ## Upload Tab
 
 1. Open clipboard
 2. Upload test image
 
-## Showcase settings
+## Settings
 
 1. Open settings
 2. Open provider dropdown, then close
 3. Change history filter to active tab
-4. Focus to history sidebar
+4. Focus on history sidebar
 5. Change tab back to `Drawing`
-6. Focus to history sidebar
-7. Delete all history
+6. Focus on history sidebar
+7. Clear all history

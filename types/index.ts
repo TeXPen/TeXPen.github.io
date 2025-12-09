@@ -24,6 +24,8 @@ export interface Candidate {
   latex: string;
 }
 
+import { Stroke } from './canvas';
+
 export interface HistoryItem {
   id: string;
   sessionId: string;
@@ -31,6 +33,7 @@ export interface HistoryItem {
   timestamp: number;
   source?: 'draw' | 'upload';
   imageData?: string; // Data URL for uploaded images
+  strokes?: Stroke[]; // Captured strokes for reconstructing drawing
   versions?: HistoryItem[];
 }
 

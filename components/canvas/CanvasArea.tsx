@@ -6,7 +6,7 @@ import { ToolType, Stroke } from '../../types/canvas';
 
 interface CanvasAreaProps {
     theme: 'dark' | 'light';
-    onStrokeEnd: (canvas: HTMLCanvasElement) => void;
+    onStrokeEnd: (canvas: HTMLCanvasElement, strokes: Stroke[]) => void;
     onClear: () => void;
 }
 
@@ -28,24 +28,28 @@ const CanvasArea: React.FC<CanvasAreaProps> = ({ theme, onStrokeEnd, onClear }) 
     const handleStrokeEnd = useCallback(() => {
         if (contentCanvasRef.current) {
             saveSnapshot(contentCanvasRef.current, strokesRef.current);
-            onStrokeEnd(contentCanvasRef.current);
+            onStrokeEnd(contentCanvasRef.current, strokesRef.current);
         }
     }, [onStrokeEnd, saveSnapshot]);
 
     const handleClear = () => {
         const canvas = canvasRef.current;
+        const contentCanvas = contentCanvasRef.current;
+
         if (canvas) {
             const ctx = canvas.getContext('2d', { willReadFrequently: true });
             if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
         }
-        const contentCanvas = contentCanvasRef.current;
+
         if (contentCanvas) {
             const ctx = contentCanvas.getContext('2d', { willReadFrequently: true });
             if (ctx) ctx.clearRect(0, 0, contentCanvas.width, contentCanvas.height);
+
+            // Allow Undo of Clear: Save the empty state
+            strokesRef.current = [];
+            saveSnapshot(contentCanvas, []);
+            onClear();
         }
-        strokesRef.current = [];
-        clearHistory();
-        onClear();
     };
 
     const handleUndo = useCallback(() => {

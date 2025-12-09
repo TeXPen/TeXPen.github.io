@@ -2,6 +2,7 @@ import React, { useState, useRef, useCallback } from 'react';
 import { useAppContext } from '../../contexts/AppContext';
 import { useThemeContext } from '../../contexts/ThemeContext';
 import { useHistoryContext } from '../../contexts/HistoryContext';
+import { Stroke } from '../../types/canvas';
 import LiquidBackground from '../common/LiquidBackground';
 import Header from './Header';
 import HistorySidebar from './HistorySidebar';
@@ -88,7 +89,7 @@ const Main: React.FC = () => {
         return () => window.removeEventListener('paste', handlePaste);
     }, [activeTab, setUploadPreview, setShowUploadResult]);
 
-    const handleInference = async (canvas: HTMLCanvasElement) => {
+    const handleInference = async (canvas: HTMLCanvasElement, strokes: Stroke[]) => {
         // Enforce confirmation
         if (!userConfirmed && !isLoadedFromCache) {
             setIsPromptDismissed(false); // Re-show prompt
@@ -97,7 +98,14 @@ const Main: React.FC = () => {
 
         const result = await infer(canvas);
         if (result) {
-            addToHistory({ id: Date.now().toString(), latex: result.latex, timestamp: Date.now(), source: 'draw', sessionId });
+            addToHistory({
+                id: Date.now().toString(),
+                latex: result.latex,
+                timestamp: Date.now(),
+                source: 'draw',
+                sessionId,
+                strokes
+            });
         }
     };
 

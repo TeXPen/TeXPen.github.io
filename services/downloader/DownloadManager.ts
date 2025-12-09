@@ -24,7 +24,19 @@ export class DownloadManager {
     const cachedResponse = await cache.match(url);
 
     if (cachedResponse) {
-      return; // Already downloaded
+      const contentLength = cachedResponse.headers.get('Content-Length');
+      const expectedSize = contentLength ? parseInt(contentLength, 10) : 0;
+      const actualBlob = await cachedResponse.clone().blob();
+
+      if (expectedSize > 0 && actualBlob.size !== expectedSize) {
+        console.warn(`[DownloadManager] Cached file ${url} is corrupted (size mismatch: ${actualBlob.size} vs ${expectedSize}). Re-downloading.`);
+        await cache.delete(url);
+      } else if (actualBlob.size === 0 && expectedSize > 0) {
+        console.warn(`[DownloadManager] Cached file ${url} is empty. Re-downloading.`);
+        await cache.delete(url);
+      } else {
+        return; // Valid cache
+      }
     }
 
     // Deduplicate concurrent requests for the same URL
@@ -115,6 +127,7 @@ export class DownloadManager {
         receivedLength += value.length;
         const blob = new Blob([value]);
 
+        chunks.push(blob);
         pendingChunks.push(blob);
         pendingSize += value.byteLength;
 

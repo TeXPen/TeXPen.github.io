@@ -28,8 +28,9 @@
 
 ## Upload Tab
 
-1. Open clipboard
-2. Upload test image
+1. Change candidates back to 1
+2. Open clipboard
+3. Upload test image
 
 ## Settings
 

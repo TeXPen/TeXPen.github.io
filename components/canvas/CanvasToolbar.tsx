@@ -49,7 +49,7 @@ const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
         if (isEraserActive) {
             setShowEraserMenu(!showEraserMenu);
         } else {
-            onToolChange('eraser-radial');
+            onToolChange('eraser-line');
             setShowEraserMenu(true);
         }
     };

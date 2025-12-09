@@ -230,6 +230,47 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({ onStrokeEnd, refCallback, con
         return false;
     };
 
+    // Split strokes based on erasure point
+    const splitStrokes = (strokes: Stroke[], erasePoint: Point, radius: number): Stroke[] => {
+        const thresholdSq = radius * radius;
+        const newStrokes: Stroke[] = [];
+
+        strokes.forEach(stroke => {
+            let currentPoints: Point[] = [];
+            let modified = false;
+
+            stroke.points.forEach((p, i) => {
+                const distSq = Math.pow(p.x - erasePoint.x, 2) + Math.pow(p.y - erasePoint.y, 2);
+
+                if (distSq > thresholdSq) {
+                    currentPoints.push(p);
+                } else {
+                    modified = true;
+                    // End current segment if we hit the eraser
+                    if (currentPoints.length > 1) { // Filter single points
+                        newStrokes.push({ ...stroke, points: [...currentPoints] });
+                    }
+                    currentPoints = [];
+                }
+            });
+
+            // Push final segment
+            if (currentPoints.length > 1) {
+                newStrokes.push({ ...stroke, points: [...currentPoints] });
+            } else if (!modified && currentPoints.length > 0) {
+                // Determine if we kept the whole stroke (single point edge case or just no collision)
+                // Actually if !modified, we should keep it.
+                // But logic above empties currentPoints on collision.
+                // If we are here and !modified, currentPoints == stroke.points
+                // So checking currentPoints.length > 1 handles it mostly, 
+                // but if stroke was 1 point? (Technically not a line, but generic handling)
+                // Let's rely on the iteration.
+            }
+        });
+
+        return newStrokes;
+    };
+
     const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
         setIsDrawing(true);
         const pos = getPos(e);
@@ -284,9 +325,8 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({ onStrokeEnd, refCallback, con
             ctx.globalCompositeOperation = 'source-over';
 
             // Also remove from strokes data for consistency
-            strokesRef.current = strokesRef.current.filter(stroke =>
-                !isPointNearStroke(scaledPos, stroke, (ERASER_SIZE / 2) * dpr)
-            );
+            // Split strokes instead of deleting them entirely
+            strokesRef.current = splitStrokes(strokesRef.current, scaledPos, (ERASER_SIZE / 2) * dpr);
 
         } else if (activeTool === 'eraser-line') {
             // Line erase - remove entire strokes

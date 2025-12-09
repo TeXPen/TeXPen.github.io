@@ -2,6 +2,7 @@ import React from 'react';
 import { useAppContext } from '../../contexts/AppContext';
 import { TeXPenLogo } from '../common/TeXPenLogo';
 import { SettingsMenu } from '../settings/SettingsMenu';
+import { Tooltip } from '../common/Tooltip';
 
 const Header: React.FC = () => {
     const {
@@ -100,18 +101,13 @@ const Header: React.FC = () => {
                             className="w-12 h-7 text-center text-xs font-mono bg-black/[0.05] dark:bg-white/[0.05] rounded-lg border border-black/10 dark:border-white/10 focus:outline-none focus:border-cyan-500 dark:focus:border-cyan-400 text-slate-700 dark:text-white transition-all hover:bg-black/[0.08] dark:hover:bg-white/[0.08] hover:border-black/20 dark:hover:border-white/20"
                         />
 
-                        <div className="relative group/info">
+                        <Tooltip
+                            content="The model generates multiple guesses for your input to improve accuracy. Choosing more candidates may be slightly slower."
+                        >
                             <svg className="w-3.5 h-3.5 text-slate-400 dark:text-white/30 cursor-help hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                             </svg>
-
-                            {/* Tooltip */}
-                            <div className="absolute top-full right-0 mt-2 w-48 p-2 bg-white dark:bg-[#111] border border-black/10 dark:border-white/10 rounded-lg shadow-xl backdrop-blur-xl z-50 opacity-0 invisible group-hover/info:opacity-100 group-hover/info:visible transition-all duration-200 text-left pointer-events-none">
-                                <p className="text-[10px] text-slate-500 dark:text-white/60 leading-tight w-40">
-                                    The model generates multiple guesses for your input to improve accuracy. Choosing more candidates may be slightly slower.
-                                </p>
-                            </div>
-                        </div>
+                        </Tooltip>
                     </div>
                 </div>
 

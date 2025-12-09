@@ -5,6 +5,7 @@ import { useHistoryContext } from '../../contexts/HistoryContext';
 import { ProviderSelector } from './ProviderSelector';
 import { QuantizationSelector } from './QuantizationSelector';
 import { INFERENCE_CONFIG } from '../../services/inference/config';
+import { Tooltip } from '../common/Tooltip';
 
 export const SettingsMenu: React.FC = () => {
     // const [isOpen, setIsOpen] = useState(false); // REMOVE local state
@@ -119,14 +120,13 @@ export const SettingsMenu: React.FC = () => {
                         <div className="flex items-center justify-between mb-2">
                             <div className="flex items-center gap-1.5">
                                 <div className="text-xs font-bold uppercase text-slate-400 dark:text-white/40">HuggingFace Model ID</div>
-                                <div
-                                    className="text-slate-400 dark:text-white/40 cursor-help"
-                                    title="This feature requires an ONNX model compatible with Transformers.js. Check the HuggingFace model card for 'onnx' tag or ONNX weights."
+                                <Tooltip
+                                    content="This feature requires an ONNX model compatible with Transformers.js. Check the HuggingFace model card for 'onnx' tag or ONNX weights."
                                 >
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="w-3.5 h-3.5 text-slate-400 dark:text-white/40 cursor-help hover:text-cyan-600 dark:hover:text-cyan-400 transition-colors">
                                         <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
                                     </svg>
-                                </div>
+                                </Tooltip>
                             </div>
                             <button
                                 onClick={() => setCustomModelId(INFERENCE_CONFIG.MODEL_ID)}

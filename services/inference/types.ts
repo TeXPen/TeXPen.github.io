@@ -33,6 +33,7 @@ export interface Beam {
   tokens: number[];
   score: number;
   done: boolean;
+  pastKeyValues?: any; // Cached decoder state for KV-cache optimization
 }
 
 // Helper alignment for transformers.js models which often lack precise types

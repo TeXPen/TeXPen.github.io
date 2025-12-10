@@ -225,15 +225,22 @@ export class InferenceService {
     let pixelValues: Tensor | null = null;
     let debugImage: string = '';
 
+    // Timing instrumentation (only log in development)
+    const isDev = import.meta.env?.DEV ?? false;
+    const timings: { preprocess?: number; generation?: number; total?: number } = {};
+    const startTotal = performance.now();
+
     try {
       if (!this.model || !this.tokenizer) {
         await this.init();
       }
       if (signal.aborted) throw new Error("Aborted");
 
+      const startPreprocess = performance.now();
       const { tensor, debugImage: dbgImg } = await preprocess(req.blob);
       pixelValues = tensor;
       debugImage = dbgImg;
+      timings.preprocess = performance.now() - startPreprocess;
 
       if (signal.aborted) throw new Error("Aborted");
 
@@ -241,6 +248,7 @@ export class InferenceService {
       const repetitionPenalty = generationConfig.repetition_penalty || 1.0;
       const effectiveNumBeams = req.numCandidates;
 
+      const startGeneration = performance.now();
       let candidates = await beamSearch(
         this.model!,
         this.tokenizer!,
@@ -250,10 +258,18 @@ export class InferenceService {
         generationConfig.max_new_tokens,
         repetitionPenalty
       );
+      timings.generation = performance.now() - startGeneration;
 
       candidates = candidates.map(c => this.postprocess(c));
 
       if (signal.aborted) throw new Error("Aborted");
+
+      timings.total = performance.now() - startTotal;
+
+      // Log timing info in development
+      if (isDev) {
+        console.log(`[InferenceService] Timing: preprocess=${timings.preprocess?.toFixed(1)}ms, generation=${timings.generation?.toFixed(1)}ms, total=${timings.total?.toFixed(1)}ms`);
+      }
 
       req.resolve({
         latex: candidates[0] || '',

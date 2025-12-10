@@ -30,6 +30,8 @@ export class ModelLoader {
       progressState[f] = { loaded: 0, total: 0 };
     });
 
+    const toMB = (bytes: number) => (bytes / 1024 / 1024).toFixed(2);
+
     const updateProgress = () => {
       if (!onProgress) return;
 
@@ -43,8 +45,15 @@ export class ModelLoader {
 
         // Identify file type
         const name = f.includes('encoder') ? 'Enc' : (f.includes('decoder') ? 'Dec' : 'File');
-        const pct = s.total > 0 ? Math.round((s.loaded / s.total) * 100) : 0;
-        parts.push(`${name}: ${pct}%`);
+        const loadedMB = toMB(s.loaded);
+        const totalMB = toMB(s.total);
+
+        if (s.total > 0) {
+          const pct = Math.round((s.loaded / s.total) * 100);
+          parts.push(`${name}: ${loadedMB}/${totalMB} MB (${pct}%)`);
+        } else {
+          parts.push(`${name}: ${loadedMB} MB`);
+        }
       });
 
       if (totalSize === 0) return;

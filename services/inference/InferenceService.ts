@@ -169,24 +169,49 @@ export class InferenceService {
       `onnx/${sessionOptions.decoder_model_file_name}`,
     ];
 
-    for (const file of commonFiles) {
-      // Construct the standard HF URL
+    // State for tracking progress across multiple files
+    const progressState: Record<string, { loaded: number, total: number }> = {};
+
+    // Initialize state
+    commonFiles.forEach(f => {
+      progressState[f] = { loaded: 0, total: 0 };
+    });
+
+    const updateProgress = () => {
+      if (!onProgress) return;
+
+      let totalLoaded = 0;
+      let totalSize = 0;
+
+      Object.values(progressState).forEach(s => {
+        totalLoaded += s.loaded;
+        totalSize += s.total;
+      });
+
+      if (totalSize === 0) return;
+
+      const mb = (totalLoaded / 1024 / 1024).toFixed(1);
+      const totalMb = (totalSize / 1024 / 1024).toFixed(1);
+      const percentage = Math.round((totalLoaded / totalSize) * 100);
+
+      onProgress(`Downloading models: ${mb}/${totalMb} MB`, percentage);
+    };
+
+    if (onProgress) onProgress(`Checking models...`, 0);
+
+    const downloadPromises = commonFiles.map(async (file) => {
       const fileUrl = `https://huggingface.co/${modelId}/resolve/main/${file}`;
       try {
-        const fileName = file.split('/').pop() || file;
-        if (onProgress) onProgress(`Checking ${fileName}...`, 0);
-
         await downloadManager.downloadFile(fileUrl, (p) => {
-          const mb = (p.loaded / 1024 / 1024).toFixed(1);
-          const total = (p.total / 1024 / 1024).toFixed(1);
-          const percentage = p.total > 0 ? Math.round((p.loaded / p.total) * 100) : 0;
-
-          if (onProgress) onProgress(`Downloading ${fileName}: ${mb}/${total} MB`, percentage);
+          progressState[file] = { loaded: p.loaded, total: p.total };
+          updateProgress();
         });
       } catch (e) {
         console.warn(`[InferenceService] Pre-download skipped for ${file}:`, e);
       }
-    }
+    });
+
+    await Promise.all(downloadPromises);
   }
 
   private async loadModelWithFallback(

@@ -182,19 +182,25 @@ export class InferenceService {
 
       let totalLoaded = 0;
       let totalSize = 0;
+      const parts: string[] = [];
 
-      Object.values(progressState).forEach(s => {
+      Object.entries(progressState).forEach(([f, s]) => {
         totalLoaded += s.loaded;
         totalSize += s.total;
+
+        // Identify file type
+        const name = f.includes('encoder') ? 'Enc' : (f.includes('decoder') ? 'Dec' : 'File');
+        const pct = s.total > 0 ? Math.round((s.loaded / s.total) * 100) : 0;
+        parts.push(`${name}: ${pct}%`);
       });
 
       if (totalSize === 0) return;
 
-      const mb = (totalLoaded / 1024 / 1024).toFixed(1);
-      const totalMb = (totalSize / 1024 / 1024).toFixed(1);
-      const percentage = Math.round((totalLoaded / totalSize) * 100);
+      // Calculate total percentage for the progress bar width
+      const totalPercentage = Math.round((totalLoaded / totalSize) * 100);
 
-      onProgress(`Downloading models: ${mb}/${totalMb} MB`, percentage);
+      // Pass the detailed string as the status text
+      onProgress(`${parts.join(' | ')}`, totalPercentage);
     };
 
     if (onProgress) onProgress(`Checking models...`, 0);

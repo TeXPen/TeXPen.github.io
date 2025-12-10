@@ -153,7 +153,7 @@ const Main: React.FC = () => {
                     <div className="absolute inset-0 border-2 border-cyan-500/30 rounded-full"></div>
                     <div className="absolute inset-0 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
-                <span className="text-sm font-medium text-slate-700 dark:text-white/90 whitespace-nowrap">
+                <span className="text-sm font-medium text-slate-700 dark:text-white/90 text-center min-w-[200px]">
                     {loadingPhase} {progress > 0 && `(${Math.round(progress)}%)`}
                 </span>
             </div>

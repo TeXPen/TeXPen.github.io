@@ -3,7 +3,6 @@ Priority
 Bugs
 
 Behavior
-- [x] Parallelize downloads for encoder/decoder
 
 Features
 

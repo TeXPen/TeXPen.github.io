@@ -196,15 +196,22 @@ export class InferenceService {
       const model = await AutoModelForVision2Seq.from_pretrained(modelId, sessionOptions) as VisionEncoderDecoderModel;
       return { model, device, dtype };
     } catch (loadError: any) {
-      // Check if this is a WebGPU buffer size / memory error
+      // Check if this is a WebGPU buffer size / memory error OR generic unsupported device error (common in Node env)
       const isWebGPUMemoryError = loadError?.message?.includes('createBuffer') ||
         loadError?.message?.includes('mappedAtCreation') ||
         loadError?.message?.includes('too large for the implementation') ||
         loadError?.message?.includes('GPUDevice');
 
-      if (isWebGPUMemoryError && device === 'webgpu') {
-        console.warn('[InferenceService] WebGPU buffer allocation failed, falling back to WASM...');
-        if (onProgress) onProgress('WebGPU memory limit hit. Switching to WASM...');
+      const isUnsupportedDeviceError = loadError?.message?.includes('Unsupported device');
+
+      if ((isWebGPUMemoryError || isUnsupportedDeviceError) && device === 'webgpu') {
+        if (isWebGPUMemoryError) {
+          console.warn('[InferenceService] WebGPU buffer allocation failed, falling back to WASM...');
+          if (onProgress) onProgress('WebGPU memory limit hit. Switching to WASM...');
+        } else {
+          console.warn('[InferenceService] WebGPU not supported in this environment, falling back to WASM...');
+          if (onProgress) onProgress('WebGPU unavailable. Switching to WASM...');
+        }
 
         // Retry with WASM
         device = 'wasm';

@@ -57,7 +57,7 @@ const MathCandidate: React.FC<{ latex: string }> = ({ latex }) => {
             const containerHeight = parentRef.current.offsetHeight;
 
             // Padding buffer
-            const xPadding = 12;
+            const xPadding = 0;
             const yPadding = 4;
 
             const availWidth = containerWidth - xPadding;
@@ -112,7 +112,7 @@ const Candidates: React.FC = () => {
                         key={`${idx}-${cand.latex}`}
                         onClick={() => selectCandidate(idx)}
                         className={`
-                relative group flex-none h-12 px-4 rounded-xl text-lg transition-all duration-300 flex items-center justify-center overflow-hidden max-w-[240px]
+                relative group flex-none h-12 px-4 rounded-xl text-lg transition-all duration-300 flex items-center justify-center overflow-hidden max-w-[240px] min-w-[64px]
                 ${selectedIndex === idx
                                 ? 'text-cyan-600 dark:text-cyan-400 scale-105'
                                 : 'text-slate-400 dark:text-white/30 hover:text-slate-600 dark:hover:text-white/60 hover:bg-black/5 dark:hover:bg-white/5'

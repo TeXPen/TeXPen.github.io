@@ -1,6 +1,12 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { ToolType, Point, Stroke } from '../../types/canvas';
 import { isPointNearStroke, isStrokeInRect, splitStrokes } from '../../utils/geometry';
+import {
+    drawAllStrokes,
+    drawSelectionHighlight,
+    drawSelectionBox,
+    copyToCanvas
+} from '../../utils/canvasRendering';
 
 interface CanvasBoardProps {
     onStrokeEnd: () => void;
@@ -111,77 +117,24 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({ onStrokeEnd, refCallback, con
         if (!ctx) return;
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.globalCompositeOperation = 'source-over';
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.lineWidth = 3;
-        ctx.strokeStyle = theme === 'dark' ? '#ffffff' : '#000000';
 
-        strokesRef.current.forEach((stroke, index) => {
-            if (stroke.points.length < 2) return;
-            ctx.beginPath();
-            ctx.moveTo(stroke.points[0].x, stroke.points[0].y);
-            for (let i = 1; i < stroke.points.length; i++) {
-                ctx.lineTo(stroke.points[i].x, stroke.points[i].y);
-            }
-            ctx.stroke();
-        });
+        // Draw all strokes using utility
+        drawAllStrokes(ctx, strokesRef.current, theme);
 
         // Draw unified selection highlight
         if (selectedStrokeIndices.length > 0) {
-            let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-
-            selectedStrokeIndices.forEach(index => {
-                const stroke = strokesRef.current[index];
-                if (stroke) {
-                    stroke.points.forEach(p => {
-                        minX = Math.min(minX, p.x);
-                        minY = Math.min(minY, p.y);
-                        maxX = Math.max(maxX, p.x);
-                        maxY = Math.max(maxY, p.y);
-                    });
-                }
-            });
-
-            if (minX !== Infinity) {
-                ctx.save();
-                ctx.strokeStyle = '#3b82f6'; // Blue color for selection
-                ctx.lineWidth = 1;
-                ctx.setLineDash([5, 5]);
-
-                const padding = 5;
-                ctx.strokeRect(minX - padding, minY - padding, (maxX - minX) + padding * 2, (maxY - minY) + padding * 2);
-                ctx.restore();
-            }
+            drawSelectionHighlight(ctx, strokesRef.current, selectedStrokeIndices);
         }
 
         // Draw selection box (on top of everything)
         if (selectionBoxRef.current && isSelecting.current) {
-            ctx.save();
-            ctx.strokeStyle = '#3b82f6';
-            ctx.fillStyle = 'rgba(59, 130, 246, 0.1)';
-            ctx.lineWidth = 1;
-            const bgX = Math.min(selectionBoxRef.current.start.x, selectionBoxRef.current.current.x);
-            const bgY = Math.min(selectionBoxRef.current.start.y, selectionBoxRef.current.current.y);
-            const bgW = Math.abs(selectionBoxRef.current.current.x - selectionBoxRef.current.start.x);
-            const bgH = Math.abs(selectionBoxRef.current.current.y - selectionBoxRef.current.start.y);
-
-            ctx.fillRect(bgX, bgY, bgW, bgH);
-            ctx.strokeRect(bgX, bgY, bgW, bgH);
-            ctx.restore();
+            drawSelectionBox(ctx, selectionBoxRef.current.start, selectionBoxRef.current.current);
         }
 
         // Copy to visible canvas
         const visibleCanvas = canvasRef.current;
         if (visibleCanvas) {
-            const visibleCtx = visibleCanvas.getContext('2d', { willReadFrequently: true });
-            if (visibleCtx) {
-                visibleCtx.save();
-                visibleCtx.resetTransform();
-                visibleCtx.clearRect(0, 0, visibleCanvas.width, visibleCanvas.height);
-                visibleCtx.drawImage(canvas, 0, 0);
-                visibleCtx.restore();
-            }
+            copyToCanvas(canvas, visibleCanvas);
         }
     }, [theme, selectedStrokeIndices]);
 

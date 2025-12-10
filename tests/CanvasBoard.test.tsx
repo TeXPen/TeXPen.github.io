@@ -296,4 +296,97 @@ describe('CanvasBoard Selection & Move', () => {
         // Verify stroke is highlighted
         expect(mockCtx.strokeRect).toHaveBeenCalled();
     });
+
+    it('allows dragging by clicking inside the bounding box', () => {
+        const strokesRef = { current: [] as Stroke[] };
+
+        // Pre-exist a stroke at (50, 50) to (60, 60)
+        strokesRef.current = [{
+            points: [{ x: 50, y: 50 }, { x: 60, y: 60 }],
+            tool: 'pen',
+            color: '#000',
+            width: 3
+        }];
+
+        const { container } = render(
+            <CanvasBoard
+                activeTool="select"
+                theme="light"
+                onStrokeEnd={vi.fn()}
+                refCallback={() => { }}
+                contentRefCallback={() => { }}
+                strokesRef={strokesRef}
+            />
+        );
+        const canvas = container.querySelector('canvas')!;
+
+        // 1. Click on stroke to select it
+        fireEvent.mouseDown(canvas, { clientX: 55, clientY: 55 });
+        fireEvent.mouseUp(canvas);
+
+        // 2. Click inside bounding box but NOT on the stroke (near edge)
+        // Bounding box is around (45, 45) to (65, 65) with 5px padding
+        fireEvent.mouseDown(canvas, { clientX: 47, clientY: 47 });
+
+        // 3. Drag to new position
+        fireEvent.mouseMove(canvas, { clientX: 57, clientY: 57 });
+        fireEvent.mouseUp(canvas);
+
+        // Verify stroke moved by +10 in both X and Y
+        const newPoints = strokesRef.current[0].points;
+        expect(newPoints[0].x).toBe(60);
+        expect(newPoints[0].y).toBe(60);
+        expect(newPoints[1].x).toBe(70);
+        expect(newPoints[1].y).toBe(70);
+    });
+
+    it('clears selection when switching away from select tool', () => {
+        const strokesRef = { current: [] as Stroke[] };
+
+        // Pre-exist a stroke
+        strokesRef.current = [{
+            points: [{ x: 50, y: 50 }, { x: 60, y: 60 }],
+            tool: 'pen',
+            color: '#000',
+            width: 3
+        }];
+
+        const { container, rerender } = render(
+            <CanvasBoard
+                activeTool="select"
+                theme="light"
+                onStrokeEnd={vi.fn()}
+                refCallback={() => { }}
+                contentRefCallback={() => { }}
+                strokesRef={strokesRef}
+            />
+        );
+        const canvas = container.querySelector('canvas')!;
+
+        // 1. Select the stroke
+        fireEvent.mouseDown(canvas, { clientX: 55, clientY: 55 });
+        fireEvent.mouseUp(canvas);
+
+        // Verify selection highlight was drawn
+        expect(mockCtx.strokeRect).toHaveBeenCalled();
+        mockCtx.strokeRect.mockClear();
+        mockCtx.setLineDash.mockClear();
+
+        // 2. Switch to pen tool
+        rerender(
+            <CanvasBoard
+                activeTool="pen"
+                theme="light"
+                onStrokeEnd={vi.fn()}
+                refCallback={() => { }}
+                contentRefCallback={() => { }}
+                strokesRef={strokesRef}
+            />
+        );
+
+        // 3. Verify selection highlight is NOT drawn (selection was cleared)
+        // The setLineDash call is only made when drawing selection highlight
+        // After clearing, strokeRect should not be called with the selection params
+        expect(mockCtx.setLineDash).not.toHaveBeenCalledWith([5, 5]);
+    });
 });

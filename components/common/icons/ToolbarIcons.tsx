@@ -29,11 +29,11 @@ export const SelectIcon = () => (
 );
 
 export const RectSelectIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="4" y="4" width="16" height="16" rx="2" strokeDasharray="4 4" /></svg>
+    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" strokeDasharray="3 3" /></svg>
 );
 
 export const LassoSelectIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-        <path d="M10 5C6 5 2 8 3 13C3 16 6 20 10 20C15 20 13 15 16 13C18 12 21 11 21 8C21 5 16 5 10 5Z" strokeDasharray="4 4" />
+        <path d="M 12 3 A 9 9 0 1 1 3 12 Q 10 10 12 3" strokeDasharray="3 3" />
     </svg>
 );

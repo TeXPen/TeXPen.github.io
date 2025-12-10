@@ -250,7 +250,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     };
 
 
-    const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+    const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return window.innerWidth >= 768;
+        }
+        return true;
+    });
     const [showVisualDebugger, setShowVisualDebugger] = useState(false);
     const [sessionId, setSessionId] = useState<string>(Date.now().toString());
 

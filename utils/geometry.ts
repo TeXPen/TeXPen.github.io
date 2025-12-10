@@ -4,6 +4,22 @@ export function distance(p1: Point, p2: Point): number {
   return Math.sqrt(Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2));
 }
 
+/**
+ * Check if a point is inside a bounding box (with optional padding)
+ */
+export function isPointInBounds(
+  point: Point,
+  bounds: { minX: number; minY: number; maxX: number; maxY: number },
+  padding: number = 0
+): boolean {
+  return (
+    point.x >= bounds.minX - padding &&
+    point.x <= bounds.maxX + padding &&
+    point.y >= bounds.minY - padding &&
+    point.y <= bounds.maxY + padding
+  );
+}
+
 // Check if two line segments (p1-p2) and (p3-p4) intersect
 export function doSegmentsIntersect(p1: Point, p2: Point, p3: Point, p4: Point): boolean {
   const ccw = (a: Point, b: Point, c: Point) => {

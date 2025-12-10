@@ -1,11 +1,12 @@
 import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { ToolType, Point, Stroke } from '../../types/canvas';
-import { isPointNearStroke, isStrokeInRect, splitStrokes } from '../../utils/geometry';
+import { isPointNearStroke, isStrokeInRect, splitStrokes, isPointInBounds } from '../../utils/geometry';
 import {
     drawAllStrokes,
     drawSelectionHighlight,
     drawSelectionBox,
-    copyToCanvas
+    copyToCanvas,
+    getSelectionBounds
 } from '../../utils/canvasRendering';
 
 interface CanvasBoardProps {
@@ -223,6 +224,17 @@ const CanvasBoard: React.FC<CanvasBoardProps> = ({ onStrokeEnd, refCallback, con
         if (activeTool === 'pen') {
             currentStrokeRef.current = [scaledPos];
         } else if (activeTool === 'select') {
+            // First, check if clicking inside existing selection bounding box
+            if (selectedStrokeIndices.length > 0) {
+                const bounds = getSelectionBounds(strokesRef.current, selectedStrokeIndices);
+                if (bounds && isPointInBounds(scaledPos, bounds, 5 * dpr)) {
+                    // Clicking inside selection bounds -> start dragging
+                    isDragging.current = true;
+                    dragStartPos.current = scaledPos;
+                    return; // Don't change selection
+                }
+            }
+
             const clickedStrokeIndex = strokesRef.current.findIndex(stroke =>
                 isPointNearStroke(scaledPos, stroke, 10 * dpr)
             );

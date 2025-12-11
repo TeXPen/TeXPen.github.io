@@ -59,26 +59,29 @@ const UploadTab: React.FC<UploadTabProps> = ({
                             {/* Bottom Panel: Source Image */}
                             <div
                                 onClick={onUploadAnother}
-                                className="flex-1 relative bg-black/5 dark:bg-white/5 flex items-center justify-center p-4 min-h-0 cursor-pointer group hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
+                                className="flex-1 relative bg-black/5 dark:bg-white/5 min-h-0 cursor-pointer group hover:bg-black/10 dark:hover:bg-white/10 transition-colors"
                             >
-                                {uploadPreview && (
-                                    <img
-                                        src={uploadPreview}
-                                        alt="Original"
-                                        className="max-w-full max-h-full object-contain shadow-lg rounded-lg transition-transform duration-300 group-hover:scale-[1.02]"
-                                    />
-                                )}
-                                <div className="absolute top-4 left-4 inline-flex items-center px-2 py-1 bg-black/20 backdrop-blur-sm rounded text-xs text-white/50">
-                                    Original Image
+                                {/* Image Area - Constrained to top portion */}
+                                <div className="absolute inset-x-0 top-0 bottom-24 flex items-center justify-center p-4">
+                                    {uploadPreview && (
+                                        <img
+                                            src={uploadPreview}
+                                            alt="Original"
+                                            className="max-w-full max-h-full object-contain shadow-lg rounded-lg transition-transform duration-300 group-hover:scale-[1.02]"
+                                        />
+                                    )}
+                                    <div className="absolute top-4 left-4 inline-flex items-center px-2 py-1 bg-black/20 backdrop-blur-sm rounded text-xs text-white/50">
+                                        Original Image
+                                    </div>
                                 </div>
 
-                                {/* Floating Upload Button */}
+                                {/* Floating Upload Button - In reserved bottom space */}
                                 <button
                                     onClick={(e) => {
                                         e.stopPropagation();
                                         onUploadAnother();
                                     }}
-                                    className="absolute bottom-6 left-1/2 -translate-x-1/2 px-8 py-3 bg-cyan-500/10 dark:bg-cyan-500/10 hover:bg-cyan-500/20 dark:hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 font-bold rounded-full border border-cyan-500/50 dark:border-cyan-400/50 hover:border-cyan-500 dark:hover:border-cyan-400 hover:shadow-lg hover:shadow-cyan-500/20 active:scale-95 transition-all flex items-center gap-2 backdrop-blur-md z-10"
+                                    className="absolute bottom-6 left-1/2 -translate-x-1/2 px-6 py-2 md:px-8 md:py-3 text-sm md:text-base bg-cyan-500/10 dark:bg-cyan-500/10 hover:bg-cyan-500/20 dark:hover:bg-cyan-500/20 text-cyan-600 dark:text-cyan-400 font-bold rounded-full border border-cyan-500/50 dark:border-cyan-400/50 hover:border-cyan-500 dark:hover:border-cyan-400 hover:shadow-lg hover:shadow-cyan-500/20 active:scale-95 transition-all flex items-center gap-2 backdrop-blur-md z-10"
                                 >
                                     <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />

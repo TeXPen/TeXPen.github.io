@@ -23,6 +23,7 @@ export interface AppContextType {
     clearModel: () => void;
     loadingPhase: string;
     isInferencing: boolean;
+    isGenerationQueued: boolean;
     debugImage: string | null;
     numCandidates: number;
     setNumCandidates: (n: number) => void;
@@ -127,6 +128,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setUserConfirmed,
         isLoadedFromCache,
         isInitialized,
+        isGenerationQueued,
     } = useInkModel(theme, quantization, provider, customModelId);
 
     // Use the extracted tab state hook
@@ -241,6 +243,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         clearModel,
         loadingPhase,
         isInferencing,
+        isGenerationQueued,
         debugImage,
         numCandidates,
         setNumCandidates,

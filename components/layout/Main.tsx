@@ -22,6 +22,7 @@ const Main: React.FC = () => {
         inferFromUrl,
         progress,
         loadingPhase,
+        isGenerationQueued,
         userConfirmed,
         isLoadedFromCache,
         loadFromHistory,
@@ -148,7 +149,7 @@ const Main: React.FC = () => {
 
     // Shared loading overlay for both tabs
     const renderLoadingOverlay = () => (
-        <ProgressToast phase={loadingPhase} progress={progress} />
+        <ProgressToast phase={loadingPhase} progress={progress} isQueued={isGenerationQueued} />
     );
 
     const showFullOverlay = (!userConfirmed && !isLoadedFromCache) || status === 'error';

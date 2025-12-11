@@ -37,8 +37,8 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = MODE
     encoderInputName: MODEL_CONFIG.ENCODER_INPUT_NAME,
     decoderInputName: MODEL_CONFIG.DECODER_INPUT_NAME,
     decoderOutputName: MODEL_CONFIG.DECODER_OUTPUT_NAME,
-    mean: MODEL_CONFIG.MEAN,
-    std: MODEL_CONFIG.STD,
+    mean: [...MODEL_CONFIG.MEAN],
+    std: [...MODEL_CONFIG.STD],
     invert: false,
     eosToken: MODEL_CONFIG.TOKENS.EOS,
     bosToken: MODEL_CONFIG.TOKENS.BOS,
@@ -49,9 +49,16 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = MODE
   const [status, setStatus] = useState<string>('idle'); // idle, loading, error, success
   const [isInferencing, setIsInferencing] = useState<boolean>(false);
   const activeInferenceCount = useRef<number>(0);
+  const pendingInferenceRef = useRef<{
+    canvas: HTMLCanvasElement;
+    resolve: (value: { latex: string; candidates: Candidate[]; debugImage: string | null } | null) => void;
+    reject: (reason?: any) => void;
+  } | null>(null);
+
   const [loadingPhase, setLoadingPhase] = useState<string>('');
   const [progress, setProgress] = useState(0);
   const [userConfirmed, setUserConfirmed] = useState(false);
+  const [isGenerationQueued, setIsGenerationQueued] = useState(false);
   const [isLoadedFromCache, setIsLoadedFromCache] = useState(false);
 
   const [isInitialized, setIsInitialized] = useState(false);
@@ -92,11 +99,20 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = MODE
 
         await inferenceService.init((phase, progress) => {
           if (isCancelled) return;
+
+          let displayPhase = phase;
           if (phase.startsWith('Loading model')) {
-            setLoadingPhase(msg);
+            displayPhase = msg;
           } else {
-            setLoadingPhase(phase);
+            displayPhase = phase;
           }
+
+          // if (pendingInferenceRef.current) {
+          //   displayPhase += " (Generation queued)";
+          // }
+
+          setLoadingPhase(displayPhase);
+
           if (progress !== undefined) {
             setProgress(progress);
           }
@@ -135,12 +151,26 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = MODE
     };
   }, [quantization, provider, customModelId, userConfirmed, isLoadedFromCache]);
 
+
+
   const infer = useCallback(async (canvas: HTMLCanvasElement) => {
     // Prevent inference if model is loading or not confirmed
-    // if (status === 'loading') {
-    //   console.warn('Inference skipped: Model is currently loading.');
-    //   return null;
-    // }
+    if (status === 'loading') {
+      console.log('Inference queued: Model is currently loading.');
+
+      if (pendingInferenceRef.current) {
+        // Cancel previous queued inference
+        pendingInferenceRef.current.resolve(null);
+      }
+
+      // Update UI immediately
+      setIsGenerationQueued(true);
+
+      return new Promise<{ latex: string; candidates: Candidate[]; debugImage: string | null } | null>((resolve, reject) => {
+        pendingInferenceRef.current = { canvas, resolve, reject };
+      });
+    }
+
     if (!userConfirmed && !isLoadedFromCache) {
       console.warn('Inference skipped: User has not confirmed model download.');
       return null;
@@ -233,6 +263,18 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = MODE
     }
   }, [infer, status]);
 
+  // Process queued inference when model becomes idle (loaded)
+  useEffect(() => {
+    if (status === 'idle' && pendingInferenceRef.current) {
+      console.log('[useInkModel] Processing queued inference');
+      const { canvas, resolve, reject } = pendingInferenceRef.current;
+      pendingInferenceRef.current = null;
+      setIsGenerationQueued(false);
+
+      infer(canvas).then(resolve).catch(reject);
+    }
+  }, [status, infer]);
+
   return {
     config,
     setConfig,
@@ -256,5 +298,6 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = MODE
     setTopK,
     topP,
     setTopP,
+    isGenerationQueued,
   };
 }

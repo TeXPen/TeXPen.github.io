@@ -1,0 +1,72 @@
+$ vitest run tests/hooks/useInkModel.test.tsx
+
+[1m[46m RUN [49m[22m [36mv4.0.15 [39m[90mD:/GitHub/TeXFlow/TeXPen[39m
+
+stderr | tests/hooks/useInkModel.test.tsx > useInkModel > initializes in idle state
+Cache API is not available or failed: TypeError: Cannot read properties of undefined (reading 'keys')
+    at checkCache (D:/GitHub/TeXFlow/TeXPen/hooks/useInkModel.ts:71:38)
+    at processTicksAndRejections (node:internal/process/task_queues:105:5)
+
+stderr | tests/hooks/useInkModel.test.tsx > useInkModel > queues inference when model is loading
+Cache API is not available or failed: TypeError: Cannot read properties of undefined (reading 'keys')
+    at checkCache (D:/GitHub/TeXFlow/TeXPen/hooks/useInkModel.ts:71:38)
+
+[90mstdout[2m | tests/hooks/useInkModel.test.tsx[2m > [22m[2museInkModel[2m > [22m[2mqueues inference when model is loading
+[22m[39mInference queued: Model is currently loading.
+
+[90mstdout[2m | tests/hooks/useInkModel.test.tsx[2m > [22m[2museInkModel[2m > [22m[2mqueues inference when model is loading
+[22m[39m[useInkModel] Processing queued inference
+
+stderr | tests/hooks/useInkModel.test.tsx > useInkModel > blocks inference when user has not confirmed and not cached
+Cache API is not available or failed: TypeError: Cannot read properties of undefined (reading 'keys')
+    at checkCache (D:/GitHub/TeXFlow/TeXPen/hooks/useInkModel.ts:71:38)
+
+stderr | tests/hooks/useInkModel.test.tsx > useInkModel > allows inference when loaded from cache (auto confirmed)
+Cache API is not available or failed: TypeError: Cannot read properties of undefined (reading 'keys')
+    at checkCache (D:/GitHub/TeXFlow/TeXPen/hooks/useInkModel.ts:71:38)
+
+ [31mΓ¥»[39m tests/hooks/useInkModel.test.tsx [2m([22m[2m4 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[33m 1285[2mms[22m[39m
+     [32mΓ£ô[39m initializes in idle state[32m 99[2mms[22m[39m
+     [32mΓ£ô[39m queues inference when model is loading[32m 88[2mms[22m[39m
+     [32mΓ£ô[39m blocks inference when user has not confirmed and not cached[32m 79[2mms[22m[39m
+[31m     [31m├ù[31m allows inference when loaded from cache (auto confirmed)[39m[33m 1018[2mms[22m[39m
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ» Failed Tests 1 ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»
+
+ FAIL  tests/hooks/useInkModel.test.tsx > useInkModel > allows inference when loaded from cache (auto confirmed)
+AssertionError: expected false to be true // Object.is equality
+
+Ignored nodes: comments, script, style
+<html>
+  <head />
+  <body>
+    <div />
+  </body>
+</html>
+
+- Expected
++ Received
+
+- true
++ false
+
+ Γ¥» tests/hooks/useInkModel.test.tsx:147:54
+    145| 
+    146|         await waitFor(() => {
+    147|             expect(result.current.isLoadedFromCache).toBe(true);
+       |                                                      ^
+    148|             expect(result.current.userConfirmed).toBe(true);
+    149|         });
+ Γ¥» runWithExpensiveErrorDiagnosticsDisabled node_modules/@testing-library/dom/dist/config.js:47:12
+ Γ¥» checkCallback node_modules/@testing-library/dom/dist/wait-for.js:124:77
+ Γ¥» Timeout.checkRealTimersCallback node_modules/@testing-library/dom/dist/wait-for.js:118:16
+
+ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»ΓÄ»[1/1]ΓÄ»
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m3 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 14:44:20
+[2m   Duration [22m 6.32s[2m (transform 186ms, setup 1.83s, import 107ms, tests 1.29s, environment 1.86s)[22m
+
+error: script "test" exited with code 1

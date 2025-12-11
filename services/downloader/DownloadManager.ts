@@ -12,6 +12,10 @@ export class DownloadManager {
   // Lower threshold to 10MB for mobile stability (was 50MB)
   private readonly BUFFER_THRESHOLD = 10 * 1024 * 1024;
 
+  // Global state for IDB availability across all downloads in this session
+  private isIDBDisabled: boolean = false;
+  private quotaDialogPromise: Promise<boolean> | null = null;
+
   private constructor() { }
 
   public static getInstance(): DownloadManager {
@@ -170,33 +174,53 @@ export class DownloadManager {
     const downloadedChunks: (Blob | Uint8Array)[] = [...chunks];
 
     // Flag to disable IDB writes if we hit a quota error (e.g. Incognito)
-    let disableIDB = false;
+    // No local flag needed, use class-level property
 
     const flushBuffer = async () => {
       if (pendingChunks.length === 0) return;
       const mergedBlob = new Blob(pendingChunks as BlobPart[]);
 
       // Save valid chunk to IDB (best effort)
-      if (!disableIDB) {
+      if (!this.isIDBDisabled) {
         try {
           await saveChunk(url, mergedBlob, totalSize, chunkIndex++, etag);
         } catch (error) {
           console.warn('[DownloadManager] Failed to save chunk to IndexedDB (likely quota exceeded).', error);
 
-          let shouldContinue = true;
-          if (this.quotaErrorHandler) {
-            shouldContinue = await this.quotaErrorHandler();
-          }
+          // Check lock
+          if (!this.isIDBDisabled) {
+            // If another download already triggered the dialog, wait for it
+            if (this.quotaDialogPromise) {
+              const shouldContinue = await this.quotaDialogPromise;
+              if (!shouldContinue) {
+                throw new Error('Download aborted by user due to storage quota limits.');
+              }
+              // If resolved true, isIDBDisabled should have been set to true by the first caller,
+              // but let's be safe and fall through.
+            } else {
+              // We are the first to hit the error
+              if (this.quotaErrorHandler) {
+                this.quotaDialogPromise = this.quotaErrorHandler();
+                const shouldContinue = await this.quotaDialogPromise;
+                this.quotaDialogPromise = null; // Release lock
 
-          if (!shouldContinue) {
-            throw new Error('Download aborted by user due to storage quota limits.');
-          }
+                if (!shouldContinue) {
+                  throw new Error('Download aborted by user due to storage quota limits.');
+                }
 
-          console.warn('[DownloadManager] Continuing download in memory-only mode.');
-          disableIDB = true;
-          // Note: We do NOT increment chunkIndex here if we failed? 
-          // Actually, chunkIndex is used for IDB keys. If we stop saving to IDB, it doesn't matter.
-          // The downloadedChunks array maintains the correct order and data.
+                // User chose to continue in memory -> Disable globally for this session
+                this.isIDBDisabled = true;
+                console.warn('[DownloadManager] Continuing ALL downloads in memory-only mode.');
+              } else {
+                // No handler? Default to memory mode silently? 
+                // Or warn. Let's warn and disable.
+                console.warn('[DownloadManager] No quota handler set. Defaulting to memory-only mode.');
+                this.isIDBDisabled = true;
+              }
+            }
+          } else {
+            // Already disabled, just skip saving
+          }
         }
       }
 

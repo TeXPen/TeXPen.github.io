@@ -35,6 +35,7 @@ const Main: React.FC = () => {
         uploadPreview,
         setUploadPreview,
         setShowUploadResult,
+        customNotification,
     } = useAppContext();
 
     const { theme } = useThemeContext();
@@ -148,9 +149,12 @@ const Main: React.FC = () => {
     };
 
     // Shared loading overlay for both tabs
-    const renderLoadingOverlay = () => (
-        <ProgressToast phase={loadingPhase} progress={progress} isQueued={isGenerationQueued} />
-    );
+    const renderLoadingOverlay = () => {
+        if (customNotification) {
+            return <ProgressToast phase={customNotification} progress={0} isQueued={false} />;
+        }
+        return <ProgressToast phase={loadingPhase} progress={progress} isQueued={isGenerationQueued} />;
+    };
 
     const showFullOverlay = (!userConfirmed && !isLoadedFromCache) || status === 'error';
 

@@ -287,6 +287,52 @@ export class DownloadManager {
     // 5. Cleanup partial IDB
     await clearPartialDownload(url);
   }
+
+  /**
+   * Checks if a file exists in the cache and if its size matches the Content-Length header.
+   * Returns { ok: true } if valid or missing (cannot verify missing),
+   * or { ok: false, reason: string } if corrupted.
+   * Note: Missing files are considered "not corrupted" by this check itself,
+   * but the caller should verify existence if needed.
+   * Actually, let's return a specific status.
+   */
+  public async checkCacheIntegrity(url: string): Promise<{ ok: boolean, reason?: string, missing?: boolean }> {
+    // @ts-ignore
+    const cacheName = env.cacheName || 'transformers-cache';
+    const cache = await caches.open(cacheName);
+    const cachedResponse = await cache.match(url);
+
+    if (!cachedResponse) {
+      return { ok: false, missing: true, reason: 'File not found in cache' };
+    }
+
+    const contentLength = cachedResponse.headers.get('Content-Length');
+    const expectedSize = contentLength ? parseInt(contentLength, 10) : 0;
+    const actualBlob = await cachedResponse.clone().blob();
+
+    if (actualBlob.size === 0 && expectedSize > 0) {
+      return {
+        ok: false,
+        reason: 'File is empty (0 bytes)'
+      };
+    } else if (expectedSize > 0 && actualBlob.size !== expectedSize) {
+      return {
+        ok: false,
+        reason: `Size mismatch: expected ${expectedSize}, got ${actualBlob.size}`
+      };
+    }
+
+    return { ok: true };
+  }
+
+  public async deleteFromCache(url: string): Promise<void> {
+    // @ts-ignore
+    const cacheName = env.cacheName || 'transformers-cache';
+    const cache = await caches.open(cacheName);
+    await cache.delete(url);
+    console.log(`[DownloadManager] Deleted ${url} from cache.`);
+  }
+
 }
 
 export const downloadManager = DownloadManager.getInstance();

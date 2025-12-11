@@ -86,6 +86,10 @@ export interface AppContextType {
 
     // Inference State
     activeInferenceTab?: 'draw' | 'upload' | null;
+
+    // Custom Notification
+    customNotification: string | null;
+    setCustomNotification: (msg: string | null) => void;
 }
 
 export const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -205,6 +209,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [settingsFocus, setSettingsFocus] = useState<'modelId' | null>(null);
 
+    // Custom Notification
+    const [customNotification, setCustomNotification] = useState<string | null>(null);
+
     const openSettings = (focusTarget?: 'modelId') => {
         setIsSettingsOpen(true);
         setSettingsFocus(focusTarget || null);
@@ -303,6 +310,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
         // Inference State
         activeInferenceTab,
+
+        // Custom Notification
+        customNotification,
+        setCustomNotification,
     };
 
     return <AppContext.Provider value={value}>{children}</AppContext.Provider>;

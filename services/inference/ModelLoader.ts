@@ -129,6 +129,33 @@ export class ModelLoader {
       }
     }
   }
+
+  public async validateModelFiles(modelId: string, sessionOptions: any): Promise<string[]> {
+    const { downloadManager } = await import('../downloader/DownloadManager');
+    const commonFiles = [
+      `onnx/${sessionOptions.encoder_model_file_name}`,
+      `onnx/${sessionOptions.decoder_model_file_name}`,
+    ];
+
+    const corruptedUrls: string[] = [];
+
+    for (const file of commonFiles) {
+      const fileUrl = `https://huggingface.co/${modelId}/resolve/main/${file}`;
+      try {
+        const result = await downloadManager.checkCacheIntegrity(fileUrl);
+        if (!result.ok && !result.missing) {
+          console.warn(`[ModelLoader] File corrupted: ${file} - ${result.reason}`);
+          corruptedUrls.push(fileUrl);
+        } else if (result.missing) {
+          console.log(`[ModelLoader] File missing (will be downloaded): ${file}`);
+        }
+      } catch (e) {
+        console.error(`[ModelLoader] Failed to check integrity for ${file}:`, e);
+      }
+    }
+
+    return corruptedUrls;
+  }
 }
 
 export const modelLoader = ModelLoader.getInstance();

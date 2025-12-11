@@ -74,6 +74,7 @@ describe('DownloadManager', () => {
 
     // Enable corruption check for tests
     (downloadManager as any).ENABLE_CORRUPTION_CHECK = true;
+    (downloadManager as any).isIDBDisabled = false;
   });
 
   afterEach(() => {
@@ -474,5 +475,61 @@ describe('DownloadManager', () => {
     expect(mockHandler).toHaveBeenCalled();
     // Should have cached file
     expect(mockCachePut).toHaveBeenCalledTimes(1);
+  });
+
+  describe('checkCacheIntegrity', () => {
+    it('should return ok for valid file', async () => {
+      const mockUrl = 'https://example.com/valid.file';
+      const mockBlob = { size: 100 };
+      const mockResponse = {
+        headers: { get: vi.fn().mockReturnValue('100') },
+        clone: vi.fn().mockReturnThis(),
+        blob: vi.fn().mockResolvedValue(mockBlob)
+      };
+      mockCacheMatch.mockResolvedValue(mockResponse);
+
+      const result = await downloadManager.checkCacheIntegrity(mockUrl);
+      expect(result).toEqual({ ok: true });
+    });
+
+    it('should return corrupt for size mismatch', async () => {
+      const mockUrl = 'https://example.com/corrupt.file';
+      const mockBlob = { size: 50 }; // Actual 50
+      const mockResponse = {
+        headers: { get: vi.fn().mockReturnValue('100') },
+        clone: vi.fn().mockReturnThis(),
+        blob: vi.fn().mockResolvedValue(mockBlob)
+      };
+      mockCacheMatch.mockResolvedValue(mockResponse);
+
+      const result = await downloadManager.checkCacheIntegrity(mockUrl);
+      expect(result.ok).toBe(false);
+      expect(result.reason).toContain('Size mismatch');
+    });
+
+    it('should return missing for file not in cache', async () => {
+      const mockUrl = 'https://example.com/missing.file';
+      mockCacheMatch.mockResolvedValue(undefined);
+
+      const result = await downloadManager.checkCacheIntegrity(mockUrl);
+      expect(result.ok).toBe(false);
+      expect(result.missing).toBe(true);
+    });
+
+    it('should return corrupt for empty file (0 bytes) even if Content-Length matches or is missing', async () => {
+      // Case 1: CL says 100, size is 0
+      const mockUrl = 'https://example.com/empty.file';
+      const mockBlob = { size: 0 };
+      const mockResponse = {
+        headers: { get: vi.fn().mockReturnValue('100') },
+        clone: vi.fn().mockReturnThis(),
+        blob: vi.fn().mockResolvedValue(mockBlob)
+      };
+      mockCacheMatch.mockResolvedValue(mockResponse);
+
+      const result = await downloadManager.checkCacheIntegrity(mockUrl);
+      expect(result.ok).toBe(false);
+      expect(result.reason).toContain('empty');
+    });
   });
 });

@@ -36,6 +36,7 @@ export const SettingsMenu: React.FC = () => {
         setTopK,
         topP,
         setTopP,
+        setCustomNotification,
     } = useAppContext();
     const { theme, toggleTheme } = useThemeContext();
     const { filterMode, setFilterMode } = useHistoryContext();
@@ -262,6 +263,66 @@ export const SettingsMenu: React.FC = () => {
 
                     <div className="h-px bg-black/5 dark:bg-white/5 mx-2" />
 
+                    {/* Storage & Downloads */}
+                    <div className="p-3">
+                        <div className="text-xs font-bold uppercase text-slate-400 dark:text-white/40 mb-2">Storage & Downloads</div>
+                        <button
+                            onClick={async () => {
+                                const { modelLoader } = await import('../../services/inference/ModelLoader');
+                                const { downloadManager } = await import('../../services/downloader/DownloadManager');
+                                const { getSessionOptions } = await import('../../services/inference/config');
+
+                                const toast = (msg: string | null) => setCustomNotification(msg);
+
+                                if (confirm('This will verify the integrity of downloaded model files and re-download any corrupted ones. Continue?')) {
+                                    try {
+                                        toast('Verifying files...');
+                                        // Get options for current custom ID or default
+                                        const modelId = customModelId || MODEL_CONFIG.ID;
+                                        // We need to guess device/dtype or just check ALL likely combinations?
+                                        // Checking current configuration is safest usage.
+                                        // Assuming webgpu/fp32 or wasm/q8 roughly.
+                                        // Let's rely on what's active or default.
+                                        const sessionOptions = getSessionOptions(provider, quantization || MODEL_CONFIG.DEFAULT_QUANTIZATION);
+
+                                        const corrupted = await modelLoader.validateModelFiles(modelId, sessionOptions);
+
+                                        if (corrupted.length > 0) {
+                                            toast(null); // Clear loading toast before confirm (optional)
+                                            if (confirm(`Found ${corrupted.length} corrupted files. Fix them now?`)) {
+                                                toast('Repairing files...');
+                                                for (const url of corrupted) {
+                                                    await downloadManager.deleteFromCache(url);
+                                                }
+                                                // Trigger re-download via preDownload
+                                                await modelLoader.preDownloadModels(modelId, sessionOptions, (status) => {
+                                                    console.log(status);
+                                                });
+                                                toast('Repaired corrupted files!');
+                                                setTimeout(() => toast(null), 3000);
+                                            }
+                                        } else {
+                                            toast('All files verified successfully.');
+                                            setTimeout(() => toast(null), 3000);
+                                        }
+                                    } catch (e) {
+                                        console.error(e);
+                                        toast('Error detecting corruption. Check console.');
+                                        setTimeout(() => toast(null), 5000);
+                                    }
+                                }
+                            }}
+                            className="w-full py-1.5 px-3 rounded-md text-xs font-medium bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors flex items-center justify-center gap-2"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="w-4 h-4">
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                            </svg>
+                            Verify & Repair Downloads
+                        </button>
+                    </div>
+
+                    <div className="h-px bg-black/5 dark:bg-white/5 mx-2" />
+
                     {/* History Filter */}
                     <div className="p-3">
                         <div className="text-xs font-bold uppercase text-slate-400 dark:text-white/40 mb-2">History Filter</div>
@@ -301,7 +362,8 @@ export const SettingsMenu: React.FC = () => {
                     </button>
 
                 </div>
-            )}
-        </div>
+            )
+            }
+        </div >
     );
 };

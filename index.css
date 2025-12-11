@@ -89,6 +89,8 @@ body {
     background-color: #fafafa;
     color: #0f172a;
     overflow-x: hidden;
+    overscroll-behavior: none;
+    -webkit-tap-highlight-color: transparent;
 }
 
 .dark body {

@@ -75,7 +75,7 @@ const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
                 <button
                     onClick={onUndo}
                     disabled={!canUndo}
-                    className={`p-2 rounded-full transition-all ${!canUndo
+                    className={`p-3 md:p-2 rounded-full transition-all flex items-center justify-center min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 ${!canUndo
                         ? 'text-slate-300 dark:text-white/10 cursor-not-allowed'
                         : 'text-slate-500 dark:text-white/40 hover:bg-black/5 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
                         }`}
@@ -86,7 +86,7 @@ const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
                 <button
                     onClick={onRedo}
                     disabled={!canRedo}
-                    className={`p-2 rounded-full transition-all ${!canRedo
+                    className={`p-3 md:p-2 rounded-full transition-all flex items-center justify-center min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 ${!canRedo
                         ? 'text-slate-300 dark:text-white/10 cursor-not-allowed'
                         : 'text-slate-500 dark:text-white/40 hover:bg-black/5 dark:hover:bg-white/5 hover:text-slate-900 dark:hover:text-white'
                         }`}
@@ -101,7 +101,7 @@ const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
                 <div className="relative">
                     <button
                         onClick={handleSelectClick}
-                        className={`p-2 rounded-full transition-all ${isSelectActive
+                        className={`p-3 md:p-2 rounded-full transition-all flex items-center justify-center min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 ${isSelectActive
                             ? 'bg-black text-white dark:bg-white dark:text-black shadow-sm'
                             : 'text-slate-500 dark:text-white/40 hover:bg-black/5 dark:hover:bg-white/5'
                             }`}
@@ -139,7 +139,7 @@ const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
 
                 <button
                     onClick={() => { onToolChange('pen'); setShowEraserMenu(false); setShowSelectMenu(false); }}
-                    className={`p-2 rounded-full transition-all ${activeTool === 'pen'
+                    className={`p-3 md:p-2 rounded-full transition-all flex items-center justify-center min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 ${activeTool === 'pen'
                         ? 'bg-black text-white dark:bg-white dark:text-black shadow-sm'
                         : 'text-slate-500 dark:text-white/40 hover:bg-black/5 dark:hover:bg-white/5'
                         }`}
@@ -152,7 +152,7 @@ const CanvasToolbar: React.FC<CanvasToolbarProps> = ({
                 <div className="relative">
                     <button
                         onClick={handleEraserClick}
-                        className={`p-2 rounded-full transition-all ${isEraserActive
+                        className={`p-3 md:p-2 rounded-full transition-all flex items-center justify-center min-w-[44px] min-h-[44px] md:min-w-0 md:min-h-0 ${isEraserActive
                             ? 'bg-black text-white dark:bg-white dark:text-black shadow-sm'
                             : 'text-slate-500 dark:text-white/40 hover:bg-black/5 dark:hover:bg-white/5'
                             }`}

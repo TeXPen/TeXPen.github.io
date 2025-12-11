@@ -1,81 +1,205 @@
 // @vitest-environment jsdom
 import { renderHook, act } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { useHistory } from '../../hooks/useHistory';
 import { HistoryItem } from '../../types';
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 describe('useHistory', () => {
   beforeEach(() => {
-    // Clear localStorage before each test
+    // Clear localStorage
     window.localStorage.clear();
+    vi.clearAllMocks();
   });
 
-  it('should not add duplicate history items in the same session', () => {
-    const { result } = renderHook(() => useHistory());
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
 
+  it('initializes with empty history if localStorage is empty', () => {
+    const { result } = renderHook(() => useHistory());
+    expect(result.current.history).toEqual([]);
+  });
+
+  it('initializes with data from localStorage', () => {
+    const mockData: HistoryItem[] = [{
+      id: '1',
+      latex: 'test',
+      timestamp: 123,
+      sessionId: 'session1'
+    }];
+    // Use real JSDOM localStorage
+    window.localStorage.setItem('texpen_history', JSON.stringify(mockData));
+
+    const { result } = renderHook(() => useHistory());
+    expect(result.current.history).toEqual(mockData);
+  });
+
+  it('adds a new item to history', () => {
+    const { result } = renderHook(() => useHistory());
+    const newItem: HistoryItem = {
+      id: '1',
+      latex: 'test',
+      timestamp: 123,
+      sessionId: 'session1'
+    };
+
+    act(() => {
+      result.current.addToHistory(newItem);
+    });
+
+    expect(result.current.history).toHaveLength(1);
+    expect(result.current.history[0].id).toBe('1');
+    // Initial version history should be created
+    expect(result.current.history[0].versions).toHaveLength(1);
+  });
+
+  it('updates existing item if sessionId matches (Smart Session Logic)', () => {
+    const { result } = renderHook(() => useHistory());
     const item1: HistoryItem = {
       id: '1',
-      sessionId: 'session-1',
-      latex: 'x^2',
-      timestamp: Date.now(),
-      source: 'draw'
+      latex: 'test1',
+      timestamp: 100,
+      sessionId: 'session1'
     };
 
     act(() => {
       result.current.addToHistory(item1);
     });
 
-    expect(result.current.history).toHaveLength(1);
-    expect(result.current.history[0].latex).toBe('x^2');
-
-    // Add identical item (same session, same latex)
+    // Add second item with SAME sessionId
     const item2: HistoryItem = {
-      ...item1,
-      id: '2', // ID might differ but logic checks latex
-      timestamp: Date.now() + 100
+      id: '2',
+      latex: 'test2',
+      timestamp: 200,
+      sessionId: 'session1'
     };
 
     act(() => {
       result.current.addToHistory(item2);
     });
 
-    // Should still be 1 item, and NO versions (since 2nd was duplicate)
-    // Wait, if 2nd is duplicate, we return `prev` unchanged. 
-    // So versions should be undefined or empty if it was the first item?
-    // Let's check the logic:
-    // If it's a new session -> add to list.
-    // If same session -> check latex.
-    // First item logic: addToHistory(item1) -> new session path -> returns [{...item, versions: [...]}]
+    expect(result.current.history).toHaveLength(1); // Should still be 1 item
+    expect(result.current.history[0].latex).toBe('test2'); // Should update to new content
+    expect(result.current.history[0].versions).toHaveLength(2); // Should have 2 versions
+    expect(result.current.history[0].versions?.[0].latex).toBe('test1');
+    expect(result.current.history[0].versions?.[1].latex).toBe('test2');
+  });
 
-    // So item1 in history WILL have versions initialized.
-    expect(result.current.history).toHaveLength(1);
-    expect(result.current.history[0].versions).toBeDefined();
-    expect(result.current.history[0].versions).toHaveLength(1); // It initializes with itself
+  it('does not duplicate version if latex content is identical', () => {
+    const { result } = renderHook(() => useHistory());
+    const item1: HistoryItem = {
+      id: '1',
+      latex: 'test',
+      timestamp: 100,
+      sessionId: 'session1'
+    };
 
-    // Now add duplicate
+    act(() => {
+      result.current.addToHistory(item1);
+    });
+
+    // Add same content again
+    const item2: HistoryItem = {
+      id: '2',
+      latex: 'test', // Identical
+      timestamp: 200,
+      sessionId: 'session1'
+    };
+
     act(() => {
       result.current.addToHistory(item2);
     });
 
-    // Should NOT have changed
     expect(result.current.history).toHaveLength(1);
-    expect(result.current.history[0].versions).toHaveLength(1);
+    expect(result.current.history[0].versions).toHaveLength(1); // Should not increase
+  });
 
-    // Now add DIFFERENT item (same session)
-    const item3: HistoryItem = {
-      ...item1,
-      id: '3',
-      latex: 'x^3', // Different content
-      timestamp: Date.now() + 200
+  it('creates new item if sessionId differs', () => {
+    const { result } = renderHook(() => useHistory());
+    const item1: HistoryItem = {
+      id: '1',
+      latex: 'test1',
+      timestamp: 100,
+      sessionId: 'session1'
     };
 
     act(() => {
-      result.current.addToHistory(item3);
+      result.current.addToHistory(item1);
     });
 
-    // Should still be 1 main item (updated), but now with more versions
+    const item2: HistoryItem = {
+      id: '2',
+      latex: 'test2',
+      timestamp: 200,
+      sessionId: 'session2' // Different session
+    };
+
+    act(() => {
+      result.current.addToHistory(item2);
+    });
+
+    expect(result.current.history).toHaveLength(2);
+    expect(result.current.history[0].sessionId).toBe('session2'); // Mewsest first
+    expect(result.current.history[1].sessionId).toBe('session1');
+  });
+
+  it('clears history', () => {
+    const { result } = renderHook(() => useHistory());
+    const item1: HistoryItem = {
+      id: '1',
+      latex: 'test1',
+      timestamp: 100,
+      sessionId: 'session1'
+    };
+
+    act(() => {
+      result.current.addToHistory(item1);
+    });
     expect(result.current.history).toHaveLength(1);
-    expect(result.current.history[0].latex).toBe('x^3');
-    expect(result.current.history[0].versions!.length).toBeGreaterThan(1);
+
+    act(() => {
+      result.current.clearHistory();
+    });
+    expect(result.current.history).toHaveLength(0);
+    expect(window.localStorage.getItem('texpen_history')).toBe('[]');
+  });
+
+  it('deletes specific history item', () => {
+    const { result } = renderHook(() => useHistory());
+    const item1: HistoryItem = { id: '1', latex: 'a', timestamp: 1, sessionId: 's1' };
+    const item2: HistoryItem = { id: '2', latex: 'b', timestamp: 2, sessionId: 's2' };
+
+    act(() => {
+      result.current.addToHistory(item1);
+      result.current.addToHistory(item2);
+    });
+
+    expect(result.current.history).toHaveLength(2);
+    expect(result.current.history[0].id).toBe('2');
+
+    act(() => {
+      result.current.deleteHistoryItem('1');
+    });
+
+    expect(result.current.history).toHaveLength(1);
+    expect(result.current.history[0].id).toBe('2');
+  });
+
+  it('persists changes to localStorage', () => {
+    // Spy on native Storage prototype
+    const setItemSpy = vi.spyOn(Storage.prototype, 'setItem');
+    const { result } = renderHook(() => useHistory());
+    const newItem: HistoryItem = {
+      id: '1',
+      latex: 'test',
+      timestamp: 123,
+      sessionId: 'session1'
+    };
+
+    act(() => {
+      result.current.addToHistory(newItem);
+    });
+
+    expect(setItemSpy).toHaveBeenCalledWith('texpen_history', expect.stringContaining('test'));
   });
 });

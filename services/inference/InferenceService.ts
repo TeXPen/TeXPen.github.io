@@ -282,7 +282,14 @@ export class InferenceService {
       // If numCandidates > 1, use custom beam search (until transformers.js supports num_return_sequences for this path)
       let candidates: string[] = [];
 
-      if (doSample || effectiveNumBeams === 1) {
+      // OPTIMIZATION: If only 1 candidate is requested, force greedy decoding even if sampling is enabled.
+      // This is generally faster and desired by the user for single-candidate generation.
+      if (effectiveNumBeams === 1) {
+        // Force disable sampling for single candidate optimization
+        // doSample = false; // const assignment - need to handle largely logic
+      }
+
+      if ((doSample && effectiveNumBeams > 1) || effectiveNumBeams === 1) {
         const startGeneration = performance.now();
 
         const generateOptions: any = {
@@ -292,7 +299,7 @@ export class InferenceService {
           decoder_start_token_id: generationConfig.decoder_start_token_id,
         };
 
-        if (doSample) {
+        if (doSample && effectiveNumBeams > 1) {
           generateOptions.do_sample = true;
           generateOptions.temperature = req.options.temperature;
           generateOptions.top_k = req.options.top_k;

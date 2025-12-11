@@ -3,4 +3,9 @@ export const GENERATION_CONFIG = {
   NUM_BEAMS: 1,
   DO_SAMPLE: false,
   FP16_REPETITION_PENALTY: 1.25,
+
+  // Sampling Defaults
+  DEFAULT_TEMPERATURE: 1.2,
+  DEFAULT_TOP_K: 20,
+  DEFAULT_TOP_P: 0.9,
 };

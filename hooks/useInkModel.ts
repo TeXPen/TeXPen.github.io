@@ -2,29 +2,47 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { ModelConfig, Candidate } from '../types';
 import { inferenceService } from '../services/inference/InferenceService';
 
-import { MODEL_CONFIG } from '../services/inference/config';
+import { MODEL_CONFIG, GENERATION_CONFIG } from '../services/inference/config';
 
 export function useInkModel(theme: 'light' | 'dark', quantization: string = MODEL_CONFIG.DEFAULT_QUANTIZATION, provider: 'webgpu' | 'wasm', customModelId: string = MODEL_CONFIG.ID) {
-  const [numCandidates, setNumCandidates] = useState<number>(1);
-  const [doSample, setDoSample] = useState(true);
-  const [temperature, setTemperature] = useState(1.2);
-  const [topK, setTopK] = useState(20);
-  const [topP, setTopP] = useState(0.9);
+  // Sampling Defaults
+  const [numCandidates, setNumCandidates] = useState<number>(GENERATION_CONFIG.NUM_BEAMS);
+  const [doSample, setDoSample] = useState(true); // Default to true for better UX with multiple candidates? Or stick to config? Sticking to hardcoded true for now as per original code logic or Config?
+  // Original was true. Config says false. Assuming original intent for hook defaults overrides global default if needed, 
+  // BUT goal is to use config. 
+  // Let's check GENERATION_CONFIG.DO_SAMPLE -> false.
+  // If I change this to false, behavior changes.
+  // User "Extract the ones in useInkModel.ts too".
+  // I should use GENERATION_CONFIG.DO_SAMPLE if I want true alignment.
+  // However, the hook had `true`.
+  // I will use `true` but note it, or maybe I should update config to true?
+  // Actually `useInkModel` had explicit defaults.
+  // Let's use `GENERATION_CONFIG.DEFAULT_DO_SAMPLE` if I added it... I didn't add it.
+  // I added DEFAULT_TEMPERATURE etc.
+  // Let's stick to extraction.
+
+  // Wait, I saw `DO_SAMPLE: false` in generation.ts.
+  // The hook has `useState(true)`.
+  // I should probably map these to new constants I added: DEFAULT_TEMPERATURE, etc.
+
+  const [temperature, setTemperature] = useState(GENERATION_CONFIG.DEFAULT_TEMPERATURE);
+  const [topK, setTopK] = useState(GENERATION_CONFIG.DEFAULT_TOP_K);
+  const [topP, setTopP] = useState(GENERATION_CONFIG.DEFAULT_TOP_P);
 
   const [config, setConfig] = useState<ModelConfig>({
-    encoderModelUrl: 'Ji-Ha/TexTeller3-ONNX-dynamic',
-    decoderModelUrl: 'Ji-Ha/TexTeller3-ONNX-dynamic',
-    tokenizerUrl: 'Ji-Ha/TexTeller3-ONNX-dynamic',
-    imageSize: 448,
-    encoderInputName: 'pixel_values',
-    decoderInputName: 'decoder_input_ids',
-    decoderOutputName: 'logits',
-    mean: [0.9545467],
-    std: [0.15394445],
+    encoderModelUrl: MODEL_CONFIG.ID,
+    decoderModelUrl: MODEL_CONFIG.ID,
+    tokenizerUrl: MODEL_CONFIG.ID,
+    imageSize: MODEL_CONFIG.IMAGE_SIZE,
+    encoderInputName: MODEL_CONFIG.ENCODER_INPUT_NAME,
+    decoderInputName: MODEL_CONFIG.DECODER_INPUT_NAME,
+    decoderOutputName: MODEL_CONFIG.DECODER_OUTPUT_NAME,
+    mean: MODEL_CONFIG.MEAN,
+    std: MODEL_CONFIG.STD,
     invert: false,
-    eosToken: '</s>',
-    bosToken: '<s>',
-    padToken: '<pad>',
+    eosToken: MODEL_CONFIG.TOKENS.EOS,
+    bosToken: MODEL_CONFIG.TOKENS.BOS,
+    padToken: MODEL_CONFIG.TOKENS.PAD,
     preferredProvider: 'webgpu',
   });
 

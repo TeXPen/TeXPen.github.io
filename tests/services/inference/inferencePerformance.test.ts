@@ -23,19 +23,24 @@ describe('beamSearch Performance', () => {
     const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
     mockModel = {
+      sessions: {
+        decoder: {
+          inputNames: ['decoder_input_ids', 'encoder_hidden_states'],
+          run: vi.fn().mockImplementation(async () => {
+            await delay(50); // 50ms delay
+            return {
+              logits: {
+                dims: [1, 1, 10],
+                data: new Float32Array(10).map((_, i) => i === 2 ? 10 : 0), // Favor token 2
+                dispose: () => { }
+              },
+              'present.0.decoder.key': new Tensor('float32', new Float32Array(1), [1, 1, 1, 1]),
+              'present.0.decoder.value': new Tensor('float32', new Float32Array(1), [1, 1, 1, 1])
+            };
+          })
+        }
+      },
       encoder: vi.fn().mockResolvedValue({ last_hidden_state: 'mock_encoder_output' }),
-      // Mock forward with significant delay to test parellelism
-      forward: vi.fn().mockImplementation(async () => {
-        await delay(50); // 50ms per forward pass
-        return {
-          logits: {
-            dims: [1, 1, 10],
-            data: new Float32Array(10).map((_, i) => i === 2 ? 10 : 0), // Favor token 2
-            dispose: () => { }
-          }
-        };
-      }),
-      generate: vi.fn(),
     };
 
     mockTokenizer = {
@@ -60,7 +65,7 @@ describe('beamSearch Performance', () => {
     const duration = performance.now() - start;
 
     // We expect successful execution
-    expect(mockModel.forward).toHaveBeenCalled();
+    expect(mockModel.sessions.decoder.run).toHaveBeenCalled();
 
     // NOTE: This assertion will FAIL initially (Sequential) and PASS after optimization (Parallel)
     // Sequential would be > 150ms. Parallel should be around 50-70ms (plus overhead).

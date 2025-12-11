@@ -94,7 +94,7 @@ export class ModelLoader {
     let sessionOptions = getSessionOptions(device, dtype);
 
     try {
-      const model = await AutoModelForVision2Seq.from_pretrained(modelId, sessionOptions) as VisionEncoderDecoderModel;
+      const model = await AutoModelForVision2Seq.from_pretrained(modelId, sessionOptions as any) as VisionEncoderDecoderModel;
       return { model, device, dtype };
     } catch (loadError: any) {
       // Check if this is a WebGPU buffer size / memory error OR generic unsupported device error (common in Node env)
@@ -122,7 +122,7 @@ export class ModelLoader {
         // Explicitly download the WASM model files so the user sees progress
         await this.preDownloadModels(modelId, sessionOptions, onProgress);
 
-        const model = await AutoModelForVision2Seq.from_pretrained(modelId, sessionOptions) as VisionEncoderDecoderModel;
+        const model = await AutoModelForVision2Seq.from_pretrained(modelId, sessionOptions as any) as VisionEncoderDecoderModel;
         return { model, device, dtype };
       } else {
         throw loadError;

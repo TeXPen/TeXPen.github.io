@@ -155,11 +155,7 @@ export class BeamSearch {
     } finally {
       disposeCache(pastKeyValues);
       if (encoderOutputs) {
-        disposeCache(encoderOutputs); // Assumes generic dispose works or handled manually
-        // encoderOutputs might need manual disposal if not covered by disposeCache generic check
-        // check encoderRunner.ts -> it returns raw output object.
-        // EncoderRunner output usually has last_hidden_state which is a Tensor.
-        if (encoderOutputs.last_hidden_state) encoderOutputs.last_hidden_state.dispose();
+        disposeCache(encoderOutputs);
       }
     }
   }

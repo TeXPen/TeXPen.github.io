@@ -3,10 +3,11 @@ import {
   PreTrainedTokenizer,
   Tensor,
 } from "@huggingface/transformers";
-import { removeStyle, addNewlines } from "../latexUtils";
+import { removeStyle, addNewlines } from "../../utils/latex";
 import { preprocess } from "./imagePreprocessing";
 import { beamSearch } from "./beamSearch";
 import { isWebGPUAvailable } from "../../utils/env";
+import { InferenceQueue, InferenceRequest } from "./utils/InferenceQueue";
 import {
   INFERENCE_CONFIG,
   getSessionOptions,
@@ -22,12 +23,15 @@ export class InferenceService {
   private model: VisionEncoderDecoderModel | null = null;
   private tokenizer: PreTrainedTokenizer | null = null;
   private static instance: InferenceService;
-  private isInferring: boolean = false;
   private dtype: string = INFERENCE_CONFIG.DEFAULT_QUANTIZATION;
   private currentModelId: string = INFERENCE_CONFIG.MODEL_ID;
   private initPromise: Promise<void> | null = null;
 
-  private constructor() { }
+  private queue: InferenceQueue;
+
+  private constructor() {
+    this.queue = new InferenceQueue((req, signal) => this.runInference(req, signal));
+  }
 
   public static getInstance(): InferenceService {
     if (!InferenceService.instance) {
@@ -88,7 +92,7 @@ export class InferenceService {
           (this.model as any).config.device !== options.device) ||
         (options.modelId && this.currentModelId !== options.modelId)
       ) {
-        if (this.isInferring) {
+        if (this.queue.getIsInferring()) {
           console.warn(
             "Changing model settings while inference is in progress."
           );
@@ -217,59 +221,15 @@ export class InferenceService {
     }
   }
 
-  private abortController: AbortController | null = null;
-  private currentInferencePromise: Promise<void> | null = null;
-  private isProcessingQueue: boolean = false;
-  private wakeQueuePromise: ((value: void) => void) | null = null;
-
-  private pendingRequestTimestamp: number = 0;
-
-  private pendingRequest: {
-    blob: Blob;
-    numCandidates: number;
-    resolve: (
-      value: InferenceResult | PromiseLike<InferenceResult>
-    ) => void;
-    reject: (reason?: any) => void;
-  } | null = null;
-
   public async infer(
     imageBlob: Blob,
     numCandidates: number = 1
   ): Promise<InferenceResult> {
-    return new Promise((resolve, reject) => {
-      if (this.pendingRequest) {
-        this.pendingRequest.reject(new Error("Skipped"));
-      }
-
-      this.pendingRequest = {
-        blob: imageBlob,
-        numCandidates,
-        resolve,
-        reject,
-      };
-      this.pendingRequestTimestamp = Date.now();
-
-      if (this.isInferring && this.abortController) {
-        console.log(
-          "[InferenceService] New request while inferring. Aborting current inference immediately."
-        );
-        this.abortController.abort();
-      }
-
-      if (this.wakeQueuePromise) {
-        this.wakeQueuePromise();
-        this.wakeQueuePromise = null;
-      }
-
-      if (!this.isProcessingQueue) {
-        this.processQueue();
-      }
-    });
+    return this.queue.infer(imageBlob, numCandidates);
   }
 
   private async runInference(
-    req: NonNullable<typeof this.pendingRequest>,
+    req: InferenceRequest,
     signal: AbortSignal
   ): Promise<void> {
     let pixelValues: Tensor | null = null;
@@ -384,58 +344,7 @@ export class InferenceService {
       }
     } finally {
       if (pixelValues) pixelValues.dispose();
-      this.isInferring = false;
-      this.abortController = null;
-      this.currentInferencePromise = null;
-
-      if (this.wakeQueuePromise) {
-        this.wakeQueuePromise();
-        this.wakeQueuePromise = null;
-      }
-    }
-  }
-
-  private async processQueue() {
-    this.isProcessingQueue = true;
-
-    try {
-      while (this.pendingRequest) {
-        if (this.currentInferencePromise && this.isInferring) {
-          console.log(
-            "[InferenceService] Waiting for current inference to finish or abort..."
-          );
-          try {
-            await this.currentInferencePromise;
-          } catch (e) {
-            /* ignore */
-          }
-        }
-
-        if (!this.pendingRequest) break;
-
-        const req = this.pendingRequest;
-        this.pendingRequest = null;
-        this.pendingRequestTimestamp = 0;
-
-        this.isInferring = true;
-        this.abortController = new AbortController();
-        const signal = this.abortController.signal;
-
-        this.currentInferencePromise = this.runInference(req, signal);
-
-        if (this.pendingRequest) {
-          continue;
-        } else {
-          await Promise.race([
-            this.currentInferencePromise,
-            new Promise<void>((resolve) => {
-              this.wakeQueuePromise = resolve;
-            }),
-          ]);
-        }
-      }
-    } finally {
-      this.isProcessingQueue = false;
+      // isInferring is handled by queue
     }
   }
 
@@ -446,7 +355,7 @@ export class InferenceService {
   }
 
   public async dispose(force: boolean = false): Promise<void> {
-    if (this.isInferring && !force) {
+    if (this.queue.getIsInferring() && !force) {
       console.warn(
         "Attempting to dispose model while inference is in progress. Ignoring (unless forced)."
       );
@@ -456,29 +365,7 @@ export class InferenceService {
     // Increment generation to invalidate any pending inits
     this.disposalGeneration++;
 
-    // Capture the promise before aborting/clearing, as the finally block in runInference clears it
-    const pendingInference = this.currentInferencePromise;
-
-    if (this.abortController) {
-      this.abortController.abort();
-      this.abortController = null;
-    }
-
-    if (this.pendingRequest) {
-      this.pendingRequest.reject(new Error("Aborted"));
-      this.pendingRequest = null;
-    }
-
-    // If we have a running inference, wait for it to clean up
-    if (pendingInference) {
-      try {
-        await pendingInference;
-      } catch (e) {
-        // Expected abort error or other runtime errors
-      }
-    }
-
-    this.isInferring = false;
+    await this.queue.dispose();
 
     if (this.model) {
       if (
@@ -505,23 +392,15 @@ export class InferenceService {
     // Increment generation to invalidate any pending inits
     this.disposalGeneration++;
 
-    // Abort any running inference immediately
-    if (this.abortController) {
-      this.abortController.abort();
-      this.abortController = null;
-    }
+    // Best effort sync disposal of queue (might not be full, but Queue doesn't support sync fully)
+    // But we can at least abort controllers if we had access.
+    // In fact, queue.dispose() is async.
+    // We can at least clear the model.
 
-    // Reject pending requests
-    if (this.pendingRequest) {
-      try {
-        this.pendingRequest.reject(new Error("Aborted"));
-      } catch (e) {
-        /* ignore */
-      }
-      this.pendingRequest = null;
-    }
+    // We can't easily wait for queue disposal sync.
+    // Trigger it async but don't wait.
+    this.queue.dispose().catch(() => { });
 
-    this.isInferring = false;
 
     // Fire and forget the model disposal - don't await
     if (this.model) {

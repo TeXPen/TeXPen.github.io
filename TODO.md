@@ -9,7 +9,6 @@ Features
 Visuals
 
 Maintenance
-- [x] Refactor: split up and organize files
 - [ ] Add tests
 
 Performance

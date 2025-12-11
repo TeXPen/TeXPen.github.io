@@ -127,7 +127,7 @@ describe('InferenceService Integration (Efficient)', () => {
       // but init() will fail (as seen in previous test).
 
       // So we just catch the error and verify it's the expected one.
-      await inferenceService.infer(new Blob([]));
+      await inferenceService.infer(new Blob([]), {});
     } catch (e: any) {
       // Expected since init failed or model is missing
       expect(e).toBeDefined();

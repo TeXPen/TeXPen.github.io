@@ -9,7 +9,7 @@ import { beamSearch } from "./beamSearch";
 import { isWebGPUAvailable } from "../../utils/env";
 import { InferenceQueue, InferenceRequest } from "./utils/InferenceQueue";
 import {
-  INFERENCE_CONFIG,
+  MODEL_CONFIG,
   getSessionOptions,
   getGenerationConfig,
 } from "./config";
@@ -24,8 +24,8 @@ export class InferenceService {
   private model: VisionEncoderDecoderModel | null = null;
   private tokenizer: PreTrainedTokenizer | null = null;
   private static instance: InferenceService;
-  private dtype: string = INFERENCE_CONFIG.DEFAULT_QUANTIZATION;
-  private currentModelId: string = INFERENCE_CONFIG.MODEL_ID;
+  private dtype: string = MODEL_CONFIG.DEFAULT_QUANTIZATION;
+  private currentModelId: string = MODEL_CONFIG.ID;
   private initPromise: Promise<void> | null = null;
 
   private queue: InferenceQueue;
@@ -123,7 +123,7 @@ export class InferenceService {
       let dtype =
         options.dtype ||
         (webgpuAvailable
-          ? INFERENCE_CONFIG.DEFAULT_QUANTIZATION
+          ? MODEL_CONFIG.DEFAULT_QUANTIZATION
           : "q8");
 
       // Update current ID if provided, otherwise keep existing (or default on first run)

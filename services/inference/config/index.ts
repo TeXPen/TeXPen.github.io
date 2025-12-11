@@ -1,16 +1,7 @@
-export const INFERENCE_CONFIG = {
-  MODEL_ID: 'Ji-Ha/TexTeller3-ONNX-dynamic',
-  DEFAULT_QUANTIZATION: 'fp32',
-  DEFAULT_PROVIDER: 'webgpu',
+import { MODEL_CONFIG } from './model';
+import { GENERATION_CONFIG } from './generation';
 
-  // Generation defaults
-  MAX_NEW_TOKENS: 128,
-  NUM_BEAMS: 1,
-  DO_SAMPLE: false,
-
-  // Penalties
-  FP16_REPETITION_PENALTY: 1.25,
-};
+export { MODEL_CONFIG, GENERATION_CONFIG };
 
 export function getSessionOptions(device: string, dtype: string) {
   // We’ll always choose explicit files per dtype
@@ -46,14 +37,14 @@ export function getSessionOptions(device: string, dtype: string) {
 
 export function getGenerationConfig(dtype: string, tokenizer: any) {
   return {
-    max_new_tokens: INFERENCE_CONFIG.MAX_NEW_TOKENS,
-    do_sample: INFERENCE_CONFIG.DO_SAMPLE,
-    num_beams: INFERENCE_CONFIG.NUM_BEAMS,
+    max_new_tokens: GENERATION_CONFIG.MAX_NEW_TOKENS,
+    do_sample: GENERATION_CONFIG.DO_SAMPLE,
+    num_beams: GENERATION_CONFIG.NUM_BEAMS,
     pad_token_id: tokenizer.pad_token_id,
     eos_token_id: tokenizer.eos_token_id,
     bos_token_id: tokenizer.bos_token_id,
     decoder_start_token_id: 0,
     // Only apply repetition penalty for fp16 to prevent loops
-    ...(dtype === 'fp16' ? { repetition_penalty: INFERENCE_CONFIG.FP16_REPETITION_PENALTY } : {}),
+    ...(dtype === 'fp16' ? { repetition_penalty: GENERATION_CONFIG.FP16_REPETITION_PENALTY } : {}),
   };
 }

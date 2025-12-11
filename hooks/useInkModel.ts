@@ -2,9 +2,9 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { ModelConfig, Candidate } from '../types';
 import { inferenceService } from '../services/inference/InferenceService';
 
-import { INFERENCE_CONFIG } from '../services/inference/config';
+import { MODEL_CONFIG } from '../services/inference/config';
 
-export function useInkModel(theme: 'light' | 'dark', quantization: string = INFERENCE_CONFIG.DEFAULT_QUANTIZATION, provider: 'webgpu' | 'wasm', customModelId: string = INFERENCE_CONFIG.MODEL_ID) {
+export function useInkModel(theme: 'light' | 'dark', quantization: string = MODEL_CONFIG.DEFAULT_QUANTIZATION, provider: 'webgpu' | 'wasm', customModelId: string = MODEL_CONFIG.ID) {
   const [numCandidates, setNumCandidates] = useState<number>(1);
   const [doSample, setDoSample] = useState(true);
   const [temperature, setTemperature] = useState(1.2);

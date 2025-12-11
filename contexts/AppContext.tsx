@@ -4,7 +4,7 @@ import { Stroke } from '../types/canvas';
 import { useInkModel } from '../hooks/useInkModel';
 import { useThemeContext } from './ThemeContext';
 import { isWebGPUAvailable } from '../utils/env';
-import { INFERENCE_CONFIG } from '../services/inference/config';
+import { MODEL_CONFIG } from '../services/inference/config';
 import { useTabState } from '../hooks/useTabState';
 
 type Provider = 'webgpu' | 'wasm';
@@ -91,9 +91,9 @@ export const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { theme } = useThemeContext();
-    const [quantization, setQuantization] = useState<string>(INFERENCE_CONFIG.DEFAULT_QUANTIZATION);
-    const [provider, setProvider] = useState<Provider>(INFERENCE_CONFIG.DEFAULT_PROVIDER as Provider);
-    const [customModelId, setCustomModelId] = useState<string>(INFERENCE_CONFIG.MODEL_ID);
+    const [quantization, setQuantization] = useState<string>(MODEL_CONFIG.DEFAULT_QUANTIZATION);
+    const [provider, setProvider] = useState<Provider>(MODEL_CONFIG.DEFAULT_PROVIDER as Provider);
+    const [customModelId, setCustomModelId] = useState<string>(MODEL_CONFIG.ID);
     const [activeTab, setActiveTab] = useState<'draw' | 'upload'>('draw');
 
     useEffect(() => {

@@ -1,0 +1,6 @@
+export const GENERATION_CONFIG = {
+  MAX_NEW_TOKENS: 128,
+  NUM_BEAMS: 1,
+  DO_SAMPLE: false,
+  FP16_REPETITION_PENALTY: 1.25,
+};

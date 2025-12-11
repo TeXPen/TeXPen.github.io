@@ -22,9 +22,9 @@ vi.mock('../../../utils/latex', () => ({
 
 // Mock config
 vi.mock('../../../services/inference/config', () => ({
-  INFERENCE_CONFIG: {
+  MODEL_CONFIG: {
     DEFAULT_QUANTIZATION: 'q8',
-    MODEL_ID: 'test-model'
+    ID: 'test-model'
   },
   getSessionOptions: vi.fn(),
   getGenerationConfig: vi.fn().mockReturnValue({

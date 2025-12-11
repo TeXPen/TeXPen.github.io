@@ -106,7 +106,7 @@ export class DownloadManager {
     // 2. Check partial download in IndexedDB
     const partial = await getPartialDownload(url);
     let startByte = 0;
-    let chunks: Blob[] = [];
+    let chunks: (Blob | Uint8Array)[] = [];
     let currentTotal = 0;
 
     if (partial) {
@@ -114,7 +114,7 @@ export class DownloadManager {
       chunks = partial.chunks;
       // Calculate total size of existing chunks
       for (const c of chunks) {
-        currentTotal += c.size;
+        currentTotal += c instanceof Blob ? c.size : c.byteLength;
       }
       startByte = currentTotal;
     }
@@ -153,13 +153,13 @@ export class DownloadManager {
     let chunkIndex = chunks.length;
 
     // Buffer for saving chunks to IDB less frequently (optimization)
-    let pendingChunks: Blob[] = [];
+    let pendingChunks: Uint8Array[] = [];
     let pendingSize = 0;
     const BUFFER_THRESHOLD = 50 * 1024 * 1024; // 50MB
 
     const flushBuffer = async () => {
       if (pendingChunks.length === 0) return;
-      const mergedBlob = new Blob(pendingChunks);
+      const mergedBlob = new Blob(pendingChunks as BlobPart[]);
       await saveChunk(url, mergedBlob, totalSize, chunkIndex++, etag);
       pendingChunks = [];
       pendingSize = 0;
@@ -175,10 +175,9 @@ export class DownloadManager {
 
       if (value) {
         receivedLength += value.length;
-        const blob = new Blob([value]);
 
-        chunks.push(blob);
-        pendingChunks.push(blob);
+        chunks.push(value);
+        pendingChunks.push(value);
         pendingSize += value.byteLength;
 
         if (pendingSize >= BUFFER_THRESHOLD) {
@@ -198,7 +197,7 @@ export class DownloadManager {
     console.log(`[DownloadManager] Download complete for ${url}. Assembling and caching...`);
 
     // 4. Assemble and store in Cache API
-    const fullBlob = new Blob(chunks, { type: 'application/octet-stream' });
+    const fullBlob = new Blob(chunks as BlobPart[], { type: 'application/octet-stream' });
 
     // Release memory held by chunks array immediately
     chunks = [];

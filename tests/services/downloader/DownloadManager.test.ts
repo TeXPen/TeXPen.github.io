@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { DownloadManager } from '../../../services/downloader/DownloadManager';
 import { getPartialDownload } from '../../../services/downloader/db';
 
@@ -18,6 +18,39 @@ describe('DownloadManager', () => {
   let mockCachePut: any;
   let mockCacheMatch: any;
   let mockCacheDelete: any;
+  let OriginalResponse: any;
+
+  beforeAll(() => {
+    OriginalResponse = global.Response;
+    // Patch Response to handle Blob bodies correctly in jsdom/node environment
+    global.Response = class MockResponse extends OriginalResponse {
+      private _blobBody: Blob | null = null;
+      constructor(body: BodyInit | null, init?: ResponseInit) {
+        // Pass null to super if it's a blob to prevent stringification "feature" in jsdom
+        super(body instanceof Blob ? null : body, init);
+        if (body instanceof Blob) {
+          this._blobBody = body;
+        }
+      }
+      async blob() {
+        if (this._blobBody) return this._blobBody;
+        return super.blob();
+      }
+      clone() {
+        // Create a new instance essentially
+        const cloned = new (global.Response as any)(this._blobBody || null, {
+          status: this.status,
+          statusText: this.statusText,
+          headers: this.headers
+        });
+        return cloned;
+      }
+    } as any;
+  });
+
+  afterAll(() => {
+    global.Response = OriginalResponse;
+  });
 
   beforeEach(() => {
     downloadManager = DownloadManager.getInstance();
@@ -38,6 +71,9 @@ describe('DownloadManager', () => {
         delete: mockCacheDelete,
       }),
     };
+
+    // Enable corruption check for tests
+    (downloadManager as any).ENABLE_CORRUPTION_CHECK = true;
   });
 
   afterEach(() => {

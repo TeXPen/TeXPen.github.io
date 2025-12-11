@@ -41,7 +41,12 @@ describe('beamSearch Reproduction', () => {
         pad_token_id: 0,
       },
       encoder: vi.fn().mockResolvedValue({ last_hidden_state: 'mock_encoder_output' }),
-      forward: vi.fn(),
+      sessions: {
+        decoder: {
+          inputNames: ['decoder_input_ids', 'encoder_hidden_states'],
+          run: vi.fn(),
+        }
+      }
     };
 
     mockTokenizer = {
@@ -67,7 +72,7 @@ describe('beamSearch Reproduction', () => {
     // We want to simulate: BOS -> 5 -> 6 -> EOS
     // Beams: 1
 
-    mockModel.forward.mockImplementation(async (inputs: any) => {
+    (mockModel.sessions.decoder.run as any).mockImplementation(async (inputs: any) => {
       // Inputs should have pixel_values, encoder_outputs, decoder_input_ids, use_cache
       // And past_key_values on subsequent steps
 

@@ -4,7 +4,7 @@ export const INFERENCE_CONFIG = {
   DEFAULT_PROVIDER: 'webgpu',
 
   // Generation defaults
-  MAX_NEW_TOKENS: 20,
+  MAX_NEW_TOKENS: 128,
   NUM_BEAMS: 1,
   DO_SAMPLE: false,
 

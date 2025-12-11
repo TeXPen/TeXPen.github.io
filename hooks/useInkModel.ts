@@ -114,10 +114,10 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = INFE
 
   const infer = useCallback(async (canvas: HTMLCanvasElement) => {
     // Prevent inference if model is loading or not confirmed
-    if (status === 'loading') {
-      console.warn('Inference skipped: Model is currently loading.');
-      return null;
-    }
+    // if (status === 'loading') {
+    //   console.warn('Inference skipped: Model is currently loading.');
+    //   return null;
+    // }
     if (!userConfirmed && !isLoadedFromCache) {
       console.warn('Inference skipped: User has not confirmed model download.');
       return null;
@@ -172,10 +172,10 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = INFE
   }, [numCandidates, status, userConfirmed, isLoadedFromCache]);
 
   const inferFromUrl = useCallback(async (url: string) => {
-    if (status === 'loading') {
-      console.warn('Inference skipped: Model is currently loading.');
-      return null;
-    }
+    // if (status === 'loading') {
+    //   console.warn('Inference skipped: Model is currently loading.');
+    //   return null;
+    // }
 
     try {
       const img = new Image();

@@ -351,6 +351,27 @@ export class DownloadManager {
             } else {
               // Already disabled, just skip saving
             }
+
+            // RECOVERY: If we switched to memory mode, we must load all PREVIOUS chunks from IDB
+            // because subsequent chunks will only be in memory.
+            if (this.isIDBDisabled) {
+              // chunkIndex was already incremented. The one that failed is (chunkIndex - 1).
+              // We need to recover indices 0 to (chunkIndex - 2).
+              const chunksToRecover = chunkIndex - 1;
+              if (chunksToRecover > 0 && downloadedChunks.length === 0) {
+                console.log(`[DownloadManager] Recovering ${chunksToRecover} chunks from IDB for memory fallback...`);
+                for (let i = 0; i < chunksToRecover; i++) {
+                  const savedChunk = await getChunk(url, i);
+                  if (savedChunk) {
+                    downloadedChunks.push(savedChunk);
+                  } else {
+                    console.error(`[DownloadManager] Failed to recover chunk ${i} from IDB during fallback.`);
+                    // If we lose a chunk, the file is corrupt. We should probably abort.
+                    throw new Error('Critical: Failed to recover saved chunks from storage during memory fallback.');
+                  }
+                }
+              }
+            }
           }
         }
 

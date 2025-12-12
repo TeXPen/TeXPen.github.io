@@ -107,7 +107,12 @@ export class ModelLoader {
 
       const isUnsupportedDeviceError = loadError?.message?.includes('Unsupported device');
 
-      if ((isWebGPUMemoryError || isUnsupportedDeviceError) && device === MODEL_CONFIG.PROVIDERS.WEBGPU) {
+      const isSessionError = loadError?.message?.includes('Failed to create the session') ||
+        loadError?.message?.includes('Validation Error') ||
+        loadError?.message?.includes('context') ||
+        loadError?.message?.includes('adapter');
+
+      if ((isWebGPUMemoryError || isUnsupportedDeviceError || isSessionError) && device === MODEL_CONFIG.PROVIDERS.WEBGPU) {
         if (isWebGPUMemoryError) {
           console.warn('[ModelLoader] WebGPU buffer allocation failed, falling back to WASM...');
           if (onProgress) onProgress('WebGPU memory limit hit. Switching to WASM...');

@@ -66,7 +66,7 @@ export interface InferenceSessionShim {
 export interface VisionEncoderDecoderModel extends PreTrainedModel {
   encoder?: VisionEncoder;
   forward: Seq2SeqForward;
-  generate: (options: Record<string, unknown>) => Promise<any>;
+  generate: (options: Record<string, unknown>) => Promise<number[][] | Tensor | unknown>;
   config: PretrainedConfig & { decoder?: Record<string, unknown>; d_model?: number; hidden_size?: number; decoder_attention_heads?: number; num_attention_heads?: number;[key: string]: unknown; };
   sessions: Record<string, InferenceSessionShim>;
   dispose: () => Promise<unknown[]>;

@@ -26,8 +26,7 @@ const DrawTab: React.FC<DrawTabProps> = ({
         loadedStrokes,
         sessionId,
         refreshSession,
-        customNotification,
-        inferenceMode
+        customNotification
     } = useAppContext();
 
     const { theme } = useThemeContext();
@@ -49,17 +48,20 @@ const DrawTab: React.FC<DrawTabProps> = ({
         refreshSession();
     };
 
-    const isParagraphMode = inferenceMode === 'paragraph';
-
     return (
-        <div className={`flex-1 flex min-h-0 relative ${isParagraphMode ? 'flex-row' : 'flex-col'}`}>
-            {/* Canvas Workspace - Left in Paragraph Mode, Bottom in Formula Mode */}
-            {/* We change order using flex-order or just standard HTML order with condition? */}
-            {/* Side-by-side: Source (Canvas) Left, Output Right is typical for OCR */}
+        <>
+            {/* Output Display Section */}
+            <div className="flex-none h-1/4 md:h-2/5 flex flex-col w-full relative z-10 shrink-0">
+                <OutputDisplay
+                    latex={latex}
+                    isInferencing={isDrawInferencing}
+                    className="flex-1 w-full"
+                />
+                <Candidates />
+            </div>
 
-            {/* If paragraph mode, we might want Canvas first in DOM or just use order-first */}
-
-            <div className={`${isParagraphMode ? 'flex-1 h-full border-r border-black/5 dark:border-white/5 order-first' : 'flex-1 relative overflow-hidden flex flex-col order-last'} `}>
+            {/* Canvas Workspace */}
+            <div className="flex-1 relative overflow-hidden flex flex-col">
                 <div className="flex-1 flex flex-col absolute inset-0 z-10">
                     <CanvasArea
                         theme={theme}
@@ -70,23 +72,7 @@ const DrawTab: React.FC<DrawTabProps> = ({
                     {((status === 'loading' && userConfirmed) || !!customNotification) && renderLoadingOverlay()}
                 </div>
             </div>
-
-            {/* Output Display Section - Right in Paragraph Mode, Top in Formula Mode */}
-            <div className={`${isParagraphMode ? 'flex-1 h-full overflow-y-auto' : 'flex-none h-1/4 md:h-2/5 flex flex-col w-full relative z-10 shrink-0'}`}>
-                <OutputDisplay
-                    latex={latex}
-                    isInferencing={isDrawInferencing}
-                    className="flex-1 w-full h-full"
-                />
-                {!isParagraphMode && <Candidates />}
-            </div>
-            {/* Candidates in Paragraph Mode? Maybe below output? */}
-            {isParagraphMode && (
-                <div className="absolute bottom-4 right-4 z-20">
-                    <Candidates />
-                </div>
-            )}
-        </div>
+        </>
     );
 };
 

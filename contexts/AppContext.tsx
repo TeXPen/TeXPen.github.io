@@ -14,8 +14,8 @@ export interface AppContextType {
     setLatex: (latex: string) => void;
     candidates: Candidate[];
     loadedStrokes?: Stroke[] | null;
-    infer: (canvas: HTMLCanvasElement, options?: { onPreprocess?: (debugImage: string) => void; mode?: 'formula' | 'paragraph' }) => Promise<{ latex: string; candidates: Candidate[] } | null>;
-    inferFromUrl: (url: string, options?: { onPreprocess?: (debugImage: string) => void; mode?: 'formula' | 'paragraph' }) => Promise<{ latex: string; candidates: Candidate[] } | null>;
+    infer: (canvas: HTMLCanvasElement, options?: { onPreprocess?: (debugImage: string) => void }) => Promise<{ latex: string; candidates: Candidate[] } | null>;
+    inferFromUrl: (url: string, options?: { onPreprocess?: (debugImage: string) => void }) => Promise<{ latex: string; candidates: Candidate[] } | null>;
     clearModel: () => void;
     loadingPhase: string;
     isInferencing: boolean;
@@ -23,8 +23,6 @@ export interface AppContextType {
     debugImage: string | null;
     numCandidates: number;
     setNumCandidates: (n: number) => void;
-    inferenceMode: 'formula' | 'paragraph';
-    setInferenceMode: (mode: 'formula' | 'paragraph') => void;
     doSample: boolean;
     setDoSample: (b: boolean) => void;
     temperature: number;

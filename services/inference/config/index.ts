@@ -43,15 +43,9 @@ export function getSessionOptions(device: string, dtype: string): SessionConfig 
   };
 }
 
-export function getGenerationConfig(
-  dtype: string,
-  tokenizer: { pad_token_id: number; eos_token_id: number; bos_token_id: number; },
-  mode: 'formula' | 'paragraph' = 'formula'
-) {
+export function getGenerationConfig(dtype: string, tokenizer: { pad_token_id: number; eos_token_id: number; bos_token_id: number; }) {
   return {
-    max_new_tokens: mode === 'paragraph'
-      ? GENERATION_CONFIG.PARAGRAPH_MAX_NEW_TOKENS
-      : GENERATION_CONFIG.MAX_NEW_TOKENS,
+    max_new_tokens: GENERATION_CONFIG.MAX_NEW_TOKENS,
     do_sample: GENERATION_CONFIG.DO_SAMPLE,
     num_beams: GENERATION_CONFIG.NUM_BEAMS,
     pad_token_id: tokenizer.pad_token_id,

@@ -272,8 +272,7 @@ export class InferenceService {
       // 2) Generation config (max tokens, repetition penalty, etc.)
       const generationConfig = getGenerationConfig(
         this.dtype,
-        this.tokenizer!,
-        req.options.mode
+        this.tokenizer!
       );
       const repetitionPenalty =
         generationConfig.repetition_penalty || 1.0;
@@ -400,7 +399,7 @@ export class InferenceService {
 
 
         const outputTokenIds = await this.model!.generate(generateOptions);
-        const decoded = this.tokenizer!.batch_decode(outputTokenIds as Tensor, {
+        const decoded = this.tokenizer!.batch_decode(outputTokenIds, {
           skip_special_tokens: true,
         });
         candidates = decoded;

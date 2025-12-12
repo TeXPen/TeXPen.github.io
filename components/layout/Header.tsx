@@ -17,8 +17,6 @@ const Header: React.FC = () => {
         activeTab,
         setActiveTab,
         toggleSidebar,
-        inferenceMode,
-        setInferenceMode,
     } = useAppContext();
 
     return (
@@ -63,28 +61,6 @@ const Header: React.FC = () => {
 
             {/* Right: Controls */}
             <div className="flex items-center gap-3">
-
-                {/* Inference Mode Toggle */}
-                <div className="flex items-center bg-black/5 dark:bg-white/5 p-1 rounded-xl border border-black/5 dark:border-white/5">
-                    <button
-                        onClick={() => setInferenceMode('formula')}
-                        className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${inferenceMode === 'formula'
-                                ? 'bg-white dark:bg-zinc-800 text-cyan-600 dark:text-cyan-400 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-300'
-                            }`}
-                    >
-                        Formula
-                    </button>
-                    <button
-                        onClick={() => setInferenceMode('paragraph')}
-                        className={`px-3 py-1 rounded-lg text-xs font-medium transition-all ${inferenceMode === 'paragraph'
-                                ? 'bg-white dark:bg-zinc-800 text-cyan-600 dark:text-cyan-400 shadow-sm'
-                                : 'text-slate-500 hover:text-slate-700 dark:text-zinc-400 dark:hover:text-zinc-300'
-                            }`}
-                    >
-                        Paragraph
-                    </button>
-                </div>
 
                 {/* Candidate Count Group */}
                 <div className="flex items-center p-1 bg-black/5 dark:bg-white/5 rounded-xl border border-black/5 dark:border-white/5">

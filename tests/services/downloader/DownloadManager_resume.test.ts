@@ -2,7 +2,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, Mock } from 'vitest';
 import { DownloadManager } from '../../../services/downloader/DownloadManager';
 import { downloadScheduler } from '../../../services/downloader/v2/DownloadScheduler';
-import { ChunkStore } from '../../../services/downloader/v2/ChunkStore';
 
 // Mock ChunkStore
 vi.mock('../../../services/downloader/v2/ChunkStore', () => {
@@ -30,7 +29,8 @@ describe('DownloadManager Resume (V2)', () => {
   let downloadManager: DownloadManager;
   let mockStore: any;
 
-  beforeEach(() => {
+  beforeEach(async () => {
+    vi.resetModules();
     vi.clearAllMocks();
 
     // Reset Scheduler instance hack

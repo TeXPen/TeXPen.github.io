@@ -3,7 +3,36 @@ import { describe, it, expect, vi, beforeEach, beforeAll, afterAll } from 'vites
 import { DownloadManager } from '../../../services/downloader/DownloadManager';
 import { ModelLoader } from '../../../services/inference/ModelLoader';
 
-// Mock DB
+// Mock IDBKeyRange
+global.IDBKeyRange = {
+  bound: vi.fn(),
+  lowerBound: vi.fn(),
+  upperBound: vi.fn(),
+  only: vi.fn(),
+} as any;
+
+// Mock V2 dependencies
+vi.mock('../../../services/downloader/v2/DownloadScheduler', () => ({
+  downloadScheduler: {
+    download: vi.fn().mockImplementation(async (url, onProgress) => {
+      // Immediate completion mock
+      if (onProgress) onProgress({ loaded: 100, total: 100, file: 'test' });
+    }),
+    getStore: vi.fn().mockReturnValue({
+      getMetadata: vi.fn().mockResolvedValue({
+        downloadedBytes: 100,
+        totalBytes: 100,
+        chunkCount: 1
+      }),
+      getStream: vi.fn().mockResolvedValue(new ReadableStream({
+        start(controller) { controller.close(); }
+      })),
+      clear: vi.fn(),
+    })
+  }
+}));
+
+// Legacy DB mock (still needed if referenced by other imports, but verified unused by DM)
 vi.mock('../../../services/downloader/db', () => ({
   getDB: vi.fn(),
   saveChunk: vi.fn(),
@@ -144,20 +173,22 @@ describe('Repair Flow Integration', () => {
     await modelLoader.preDownloadModels(MODEL_ID, sessionOptions, () => { });
 
     // 4. Verify
-    // Expect fetch to be called (meaning it didn't skip due to cache)
-    expect(global.fetch).toHaveBeenCalledWith(FULL_URL, expect.anything());
+    // Expect scheduler to be called instead of direct fetch (implementation detail masked by mock)
+    const { downloadScheduler } = await import('../../../services/downloader/v2/DownloadScheduler');
+    expect(downloadScheduler.download).toHaveBeenCalledWith(FULL_URL, expect.anything());
 
     // Expect cache.put to be called (download saved)
-    expect(mockCachePut).toHaveBeenCalledTimes(2); // Once per file (encoder, decoder), assuming distinct calls
+    expect(mockCachePut).toHaveBeenCalledTimes(2); // Once per file (encoder, decoder)
   });
 
   it('should clear partial download from DB when deleting from cache', async () => {
-    const { clearPartialDownload } = await import('../../../services/downloader/db');
+    const { downloadScheduler } = await import('../../../services/downloader/v2/DownloadScheduler');
+    const store = downloadScheduler.getStore();
 
     const testUrl = 'https://example.com/test.file';
     await downloadManager.deleteFromCache(testUrl);
 
-    expect(clearPartialDownload).toHaveBeenCalledWith(testUrl);
+    expect(store.clear).toHaveBeenCalledWith(testUrl);
   });
 });
 

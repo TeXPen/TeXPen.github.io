@@ -83,7 +83,27 @@ export class DownloadManager {
       return { ok: false, missing: true, reason: 'File not found in cache' };
     }
 
+    const contentLength = cachedResponse.headers.get('Content-Length');
+    if (contentLength) {
+      const expectedSize = parseInt(contentLength, 10);
+      const blob = await cachedResponse.clone().blob();
+      if (blob.size !== expectedSize) {
+        return { ok: false, reason: `Size mismatch: expected ${expectedSize}, got ${blob.size}` };
+      }
+    }
+
     return { ok: true };
+  }
+
+  public async deleteFromCache(url: string): Promise<void> {
+    // @ts-expect-error - env.cacheName exists
+    const cacheName = env.cacheName || 'transformers-cache';
+    const cache = await caches.open(cacheName);
+    await cache.delete(url);
+
+    // Also clear from V2 store just in case
+    const store = downloadScheduler.getStore();
+    await store.clear(url);
   }
 }
 

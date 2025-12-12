@@ -44,14 +44,7 @@ export const useVerifyDownloads = () => {
               closeDialog();
               toast('Repairing files...');
               for (const url of corrupted) {
-                // @ts-expect-error - delete from cache might be missing in type defs temporarily
-                if (downloadManager.deleteFromCache) {
-                  // @ts-expect-error - method not yet typed
-                  await downloadManager.deleteFromCache(url);
-                } else {
-                  // Fallback or ignore if method missing, to avoid crash
-                  console.warn('deleteFromCache not available on downloadManager');
-                }
+                await downloadManager.deleteFromCache(url);
               }
               await modelLoader.preDownloadModels(modelId, sessionOptions, (status, progress) => {
                 toast({ message: status, progress });

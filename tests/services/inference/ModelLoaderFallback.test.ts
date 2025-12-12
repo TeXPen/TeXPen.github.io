@@ -13,9 +13,14 @@ const { mockAutoModel, mockDownloadManager } = vi.hoisted(() => {
 // Mock the modules
 vi.mock("@huggingface/transformers", () => ({
   AutoModelForVision2Seq: mockAutoModel,
+  env: {
+    allowLocalModels: false,
+    useBrowserCache: true,
+    cacheName: 'transformers-cache-test'
+  }
 }));
 
-vi.mock("../../../services/inference/downloader/DownloadManager", () => ({
+vi.mock("../../../services/downloader/DownloadManager", () => ({
   downloadManager: mockDownloadManager,
 }));
 

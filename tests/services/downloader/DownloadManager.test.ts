@@ -1,83 +1,40 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { DownloadManager } from '../../../services/downloader/DownloadManager';
+import { downloadScheduler } from '../../../services/downloader/v2/DownloadScheduler';
 
+// Mocks
+const mockStore = {
+  getMetadata: vi.fn(),
+  appendChunk: vi.fn(),
+  clear: vi.fn(),
+  getStream: vi.fn(),
+};
 
-// Mock DB
-vi.mock('../../../services/downloader/db', () => ({
-  getDB: vi.fn(),
-  saveChunk: vi.fn(),
-  getPartialDownload: vi.fn(),
-  clearPartialDownload: vi.fn(),
-  getChunk: vi.fn(),
+// Mock DownloadScheduler
+vi.mock('../../../services/downloader/v2/DownloadScheduler', () => ({
+  downloadScheduler: {
+    download: vi.fn(),
+    getStore: vi.fn(() => mockStore),
+  }
 }));
-
-// Access mocked functions
-import { saveChunk, getDB, getPartialDownload as mockGetPartial, getChunk as mockGetChunk } from '../../../services/downloader/db';
 
 describe('DownloadManager', () => {
   let downloadManager: DownloadManager;
   let mockCachePut: any;
   let mockCacheMatch: any;
-  let mockCacheDelete: any;
   let OriginalResponse: any;
 
   beforeAll(() => {
     OriginalResponse = global.Response;
-    // Patch Response to handle Blob bodies correctly in jsdom/node environment
+    // Basic Response mock for arrayBuffer/blob
     global.Response = class MockResponse extends OriginalResponse {
-      private _blobBody: Blob | null = null;
-      private _streamBody: ReadableStream | null = null;
-
-      constructor(body: BodyInit | null, init?: ResponseInit) {
-        // Pass null to super if it's a blob or stream to prevent issues in jsdom/mock
-        const isBlob = body instanceof Blob;
-        const isStream = body instanceof ReadableStream;
-
-        super(isBlob || isStream ? null : body, init);
-
-        if (isBlob) {
-          this._blobBody = body;
-        }
-        if (isStream) {
-          this._streamBody = body;
-        }
+      constructor(body: any, init?: any) {
+        super(null, init);
+        (this as any)._body = body;
       }
-      async blob() {
-        if (this._blobBody) return this._blobBody;
-        if (this._streamBody) {
-          // Read stream to blob
-          const reader = this._streamBody.getReader();
-          const chunks = [];
-          while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            chunks.push(value);
-          }
-          return new Blob(chunks);
-        }
-        return super.blob();
-      }
-      async arrayBuffer() {
-        const blob = await this.blob();
-        if (blob.arrayBuffer) {
-          return blob.arrayBuffer();
-        }
-        return new Promise((resolve, reject) => {
-          const reader = new FileReader();
-          reader.onload = () => resolve(reader.result as ArrayBuffer);
-          reader.onerror = reject;
-          reader.readAsArrayBuffer(blob);
-        });
-      }
-      clone() {
-        const cloned = new (global.Response as any)(this._blobBody || this._streamBody || null, {
-          status: this.status,
-          statusText: this.statusText,
-          headers: this.headers
-        });
-        return cloned;
-      }
+      async blob() { return (this as any)._body; }
+      async arrayBuffer() { return (this as any)._body.arrayBuffer(); }
     } as any;
   });
 
@@ -89,316 +46,92 @@ describe('DownloadManager', () => {
     downloadManager = DownloadManager.getInstance();
     vi.clearAllMocks();
 
-    // Mock global fetch
-    global.fetch = vi.fn();
-
-    // Mock global crypto
-    Object.defineProperty(global, 'crypto', {
-      value: {
-        subtle: {
-          digest: vi.fn().mockResolvedValue(new ArrayBuffer(32))
-        }
-      },
-      writable: true
-    });
-
-    // Mock caches
     mockCachePut = vi.fn().mockResolvedValue(undefined);
     mockCacheMatch = vi.fn().mockResolvedValue(null);
-    mockCacheDelete = vi.fn().mockResolvedValue(true);
-
-    // Mock DB Store
-    const dbStore = new Map<string, { chunks: any[] }>();
-    (saveChunk as any).mockImplementation(async (url: string, chunk: any, total: number, index: number) => {
-      // In new schema we store chunks separately
-      if (!dbStore.has(url)) dbStore.set(url, { chunks: [] });
-      dbStore.get(url)!.chunks[index] = chunk;
-    });
-
-    (mockGetChunk as any).mockImplementation(async (url: string, index: number) => {
-      const entry = dbStore.get(url);
-      return entry?.chunks[index];
-    });
-
-    (getDB as any).mockResolvedValue({
-      get: vi.fn().mockImplementation(async (storeName: string, url: string) => {
-        // Mock generic get? But implementation uses getPartialDownload/getChunk wrapper mostly.
-        // Except for checks?
-        return dbStore.get(url);
-      }),
-    });
-
-    // Expose dbStore for specific tests
-    (global as any).__mockDbStore = dbStore;
 
     (global as any).caches = {
       open: vi.fn().mockResolvedValue({
         match: mockCacheMatch,
         put: mockCachePut,
-        delete: mockCacheDelete,
-      }),
+        delete: vi.fn(),
+      })
     };
-
-    // Enable corruption check for tests
-    (downloadManager as any).ENABLE_CORRUPTION_CHECK = true;
-    (downloadManager as any).isIDBDisabled = false;
   });
 
-  afterEach(() => {
-    vi.resetAllMocks();
-  });
+  it('should delegate download to scheduler and finalize cache', async () => {
+    const url = 'http://test.com/file';
 
-  it('should download a file, buffer small chunks, and save complete file to cache', async () => {
-    const mockUrl = 'https://example.com/model.onnx';
-    const mockContent = new Uint8Array([1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
-    const mockStream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(mockContent.slice(0, 5));
-        controller.enqueue(mockContent.slice(5, 10));
-        controller.close();
-      }
+    // Mock Scheduler behavior
+    (downloadScheduler.download as any).mockImplementation(async (u: string, cb: any) => {
+      // Simulate progress
+      cb({ loaded: 100, total: 100 });
     });
 
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      headers: new Headers({ 'Content-Length': '10', 'Etag': 'test-etag' }),
-      body: mockStream,
-    });
-
-    await downloadManager.downloadFile(mockUrl);
-
-    // Verify buffering: 10 bytes < 5MB threshold, so saveChunk should only be called ONCE at the end (flush)
-    // Actually current implementation flushes on done too.
-    expect(saveChunk).toHaveBeenCalledTimes(1);
-
-    // Check call arguments for index 0 (merged)
-    expect(saveChunk).toHaveBeenCalledWith(mockUrl, expect.any(Blob), 10, 0, 'test-etag');
-
-    // CRITICAL: Verify cache.put received the full blob
-    // This tests the createIDBStream reading back from our mocked getChunk
-    expect(mockCachePut).toHaveBeenCalledTimes(1);
-    const [putUrl, putResponse] = mockCachePut.mock.calls[0];
-    expect(putUrl).toBe(mockUrl);
-
-    // Verify response blob size
-    const blob = await putResponse.blob();
-    expect(blob.size).toBe(10);
-  });
-
-  it('should resume from partial state and append new chunks', async () => {
-    const mockUrl = 'https://example.com/large.bin';
-    const existingData = new Uint8Array(50).fill(1);
-    const existingBlob = new Blob([existingData]);
-
-    // SETUP: Populate the Mock DB with the existing chunk
-    const dbStore = (global as any).__mockDbStore;
-    if (dbStore) {
-      dbStore.set(mockUrl, { chunks: [existingBlob] });
-    }
-
-    // Mock existing partial state (Metadata only)
-    (mockGetPartial as any).mockResolvedValue({
-      url: mockUrl,
-      // The implementation iterates chunks to calculate size, so we don't strictly base off these except chunkCount
+    // Mock Store behavior for finalize
+    mockStore.getMetadata.mockResolvedValue({
+      url,
       totalBytes: 100,
-      chunkCount: 1,
-      etag: 'test-etag',
-      lastModified: Date.now()
+      downloadedBytes: 100,
+      chunkCount: 1
     });
 
-    // Mock fetch to return remaining 50 bytes
     const mockStream = new ReadableStream({
       start(controller) {
-        controller.enqueue(new Uint8Array(50).fill(2));
+        controller.enqueue(new Uint8Array(100));
         controller.close();
       }
     });
+    mockStore.getStream.mockResolvedValue(mockStream);
 
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      headers: new Headers({ 'Content-Length': '50', 'Etag': 'test-etag' }),
-      status: 206, // Partial Content
-      body: mockStream,
-    });
+    await downloadManager.downloadFile(url);
 
-    await downloadManager.downloadFile(mockUrl);
-
-    // Should call fetch with Range header
-    expect(global.fetch).toHaveBeenCalledWith(mockUrl, expect.objectContaining({
-      headers: { 'Range': 'bytes=50-' }
-    }));
-
-    // Should save new chunk at index 1 (since 0 existed)
-    expect(saveChunk).toHaveBeenCalledWith(mockUrl, expect.any(Blob), 100, 1, 'test-etag');
-
-    // Verify final cache put has 100 bytes (50 existing + 50 new)
-    expect(mockCachePut).toHaveBeenCalledTimes(1);
-    const response = mockCachePut.mock.calls[0][1];
-    const blob = await response.blob();
-    expect(blob.size).toBe(100);
+    expect(downloadScheduler.download).toHaveBeenCalledWith(url, expect.any(Function));
+    expect(mockStore.getMetadata).toHaveBeenCalledWith(url);
+    expect(mockStore.getStream).toHaveBeenCalledWith(url, 1);
+    expect(mockCachePut).toHaveBeenCalled();
+    expect(mockStore.clear).toHaveBeenCalledWith(url);
   });
 
-  it('should deduplicate concurrent requests for the same URL', async () => {
-    const mockUrl = 'https://example.com/duplicate.file';
-    let fetchCallCount = 0;
+  it('should throw integrity error if downloaded bytes mismatched', async () => {
+    const url = 'http://test.com/corrupt';
 
-    // Simulate a slow fetch
-    (global.fetch as any).mockImplementation(async () => {
-      fetchCallCount++;
-      await new Promise(resolve => setTimeout(resolve, 100)); // Delay
-      return {
-        ok: true,
-        headers: new Headers({ 'Content-Length': '10' }),
-        body: new ReadableStream({
-          start(controller) {
-            controller.enqueue(new Uint8Array(10));
-            controller.close();
-          }
-        })
-      };
+    (downloadScheduler.download as any).mockResolvedValue(undefined);
+
+    mockStore.getMetadata.mockResolvedValue({
+      url,
+      totalBytes: 100,
+      downloadedBytes: 50, // Mismatch
+      chunkCount: 1
     });
 
-    const p1 = downloadManager.downloadFile(mockUrl);
-    const p2 = downloadManager.downloadFile(mockUrl);
-
-    expect(p1).toBe(p2); // Same promise instance
-
-    await Promise.all([p1, p2]);
-
-    expect(fetchCallCount).toBe(1); // Only one network request
-  });
-
-  it('should limit concurrent downloads to MAX_CONCURRENT (3)', async () => {
-    const urls = ['http://1', 'http://2', 'http://3', 'http://4'];
-    let runningCount = 0;
-    let maxRunning = 0;
-
-    // Mock fetch to track concurrency
-    (global.fetch as any).mockImplementation(async (_url: string) => {
-      runningCount++;
-      maxRunning = Math.max(maxRunning, runningCount);
-      await new Promise(resolve => setTimeout(resolve, 50)); // Hold connection
-      runningCount--;
-      return {
-        ok: true,
-        headers: new Headers({ 'Content-Length': '10' }),
-        body: new ReadableStream({
-          start(controller) {
-            controller.enqueue(new Uint8Array(10));
-            controller.close();
-          }
-        })
-      };
-    });
-
-    // Fire 4 requests
-    await Promise.all(urls.map(url => downloadManager.downloadFile(url)));
-
-    expect(maxRunning).toBe(3); // Should strictly adhere to limit
-  });
-
-  it('should flush buffer periodically when chunks exceed buffer threshold', async () => {
-    // 1. Setup: Patch BUFFER_THRESHOLD to a small value (50 bytes)
-    (downloadManager as any).BUFFER_THRESHOLD = 50;
-
-    const mockUrl = 'https://example.com/mobile-large.bin';
-
-    // 2. Simulate stream larger than threshold (e.g. 150 bytes)
-    const chunkSize = 10;
-    const totalSize = 150;
-    const mockContent = new Uint8Array(totalSize).fill(1); // 150 bytes of 1s
-
-    const mockStream = new ReadableStream({
-      start(controller) {
-        for (let i = 0; i < totalSize; i += chunkSize) {
-          controller.enqueue(mockContent.slice(i, i + chunkSize));
-        }
-        controller.close();
-      }
-    });
-
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      headers: new Headers({ 'Content-Length': totalSize.toString(), 'Etag': 'mobile-test' }),
-      body: mockStream,
-    });
-
-    // 3. Run download
-    await downloadManager.downloadFile(mockUrl);
-
-    // 4. Verification:
-    // 50 bytes -> flush -> saveChunk(0)
-    // 50 bytes -> flush -> saveChunk(1)
-    // 50 bytes -> flush -> saveChunk(2)
-    expect(saveChunk).toHaveBeenCalledTimes(3);
-
-    // Verify arguments of calls
-    expect(saveChunk).toHaveBeenCalledWith(mockUrl, expect.any(Blob), totalSize, 0, 'mobile-test'); // index 0
-    expect(saveChunk).toHaveBeenCalledWith(mockUrl, expect.any(Blob), totalSize, 1, 'mobile-test'); // index 1
-    expect(saveChunk).toHaveBeenCalledWith(mockUrl, expect.any(Blob), totalSize, 2, 'mobile-test'); // index 2
-
-    // Verify final cache put is full size
-    expect(mockCachePut).toHaveBeenCalledTimes(1);
-    const response = mockCachePut.mock.calls[0][1];
-    const blob = await response.blob();
-    expect(blob.size).toBe(totalSize);
-  });
-
-  it('should throw error if download stream ends prematurely (size mismatch)', async () => {
-    const mockUrl = 'https://example.com/incomplete.file';
-
-    // Simulate stream that ends after 50 bytes
-    const mockContent = new Uint8Array(50).fill(1);
-    const mockStream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(mockContent);
-        controller.close(); // End early
-      }
-    });
-
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      headers: new Headers({ 'Content-Length': '100', 'Etag': 'incomplete-tag' }), // Header says 100
-      body: mockStream,
-    });
-
-    // Expect error
-    await expect(downloadManager.downloadFile(mockUrl)).rejects.toThrow(/Download incomplete/);
-
-    // Verify it didn't cache the bad file
+    await expect(downloadManager.downloadFile(url)).rejects.toThrow(/Integrity check failed/);
     expect(mockCachePut).not.toHaveBeenCalled();
   });
 
-  it('should continue download in memory if IDB write fails (e.g. Incognito/Quota)', async () => {
-    const mockUrl = 'https://example.com/incognito.file';
+  it('should emit progress events', async () => {
+    const url = 'http://test.com/progress';
+    const onProgress = vi.fn();
 
-    // Mock saveChunk to throw error
-    (saveChunk as any).mockRejectedValue(new Error('QuotaExceededError'));
-
-    const mockContent = new Uint8Array(20).fill(1);
-    const mockStream = new ReadableStream({
-      start(controller) {
-        controller.enqueue(mockContent);
-        controller.close();
-      }
+    (downloadScheduler.download as any).mockImplementation(async (u: string, cb: any) => {
+      cb({ loaded: 50, total: 100 });
     });
 
-    (global.fetch as any).mockResolvedValue({
-      ok: true,
-      headers: new Headers({ 'Content-Length': '20' }),
-      body: mockStream,
+    mockStore.getMetadata.mockResolvedValue({
+      url,
+      totalBytes: 100,
+      downloadedBytes: 100,
+      chunkCount: 1
     });
+    mockStore.getStream.mockResolvedValue(new ReadableStream({
+      start(c) { c.close(); }
+    }));
 
-    // Should NOT throw
-    await downloadManager.downloadFile(mockUrl);
+    await downloadManager.downloadFile(url, onProgress);
 
-    // Verify it TRIED to save to IDB (but failed)
-    expect(saveChunk).toHaveBeenCalled();
-
-    // CRITICAL: Verify file was still cached correctly despite IDB failure
-    expect(mockCachePut).toHaveBeenCalledTimes(1);
-    const response = mockCachePut.mock.calls[0][1];
-    const blob = await response.blob();
-    expect(blob.size).toBe(20);
+    expect(onProgress).toHaveBeenCalledWith({
+      loaded: 50,
+      total: 100,
+      file: 'progress'
+    });
   });
 });

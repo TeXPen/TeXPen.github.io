@@ -193,12 +193,38 @@ export class DownloadManager {
 
     const response = await fetch(url, { headers });
 
-    if (!response.ok && response.status !== 206) {
-      throw new Error(`Failed to download ${url}: ${response.status} ${response.statusText}`);
+    let isComplete = false;
+
+    if (!response.ok) {
+      if (response.status === 416) {
+        // Handle 416 Range Not Satisfiable
+        // This usually means we already have the full file
+        const contentRange = response.headers.get('Content-Range');
+        if (contentRange) {
+          const match = contentRange.match(/\*\/(\d+)/);
+          if (match) {
+            const serverSize = parseInt(match[1], 10);
+            if (startByte === serverSize) {
+              console.log(`[DownloadManager] 416 received but local size (${startByte}) matches server size (${serverSize}). Assuming download complete.`);
+              isComplete = true;
+            } else {
+              throw new Error(`Failed to download ${url}: Range Not Satisfiable. Local: ${startByte}, Server: ${serverSize}`);
+            }
+          }
+        } else {
+          throw new Error(`Failed to download ${url}: 416 Range Not Satisfiable (no Content-Range header)`);
+        }
+      } else if (response.status !== 206) {
+        throw new Error(`Failed to download ${url}: ${response.status} ${response.statusText}`);
+      }
     }
 
     const contentLengthHeader = response.headers.get('Content-Length');
-    const totalSize = contentLengthHeader ? parseInt(contentLengthHeader, 10) + startByte : (partial?.totalBytes || 0);
+    // If completed (416), totalSize is startByte. Otherwise calculate.
+    const totalSize = isComplete
+      ? startByte
+      : (contentLengthHeader ? parseInt(contentLengthHeader, 10) + startByte : (partial?.totalBytes || 0));
+
     const etag = response.headers.get('Etag');
 
     // If server doesn't support ranges (200 OK instead of 206 Partial Content), we must restart
@@ -210,119 +236,125 @@ export class DownloadManager {
       await clearPartialDownload(url);
     }
 
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error('Response body is null');
-
     let receivedLength = currentTotal;
 
-    // Process stream
-    let chunkIndex = chunks.length;
+    if (!isComplete) {
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error('Response body is null');
 
-    // Buffer for saving chunks to IDB less frequently (optimization)
-    let pendingChunks: Uint8Array[] = [];
-    let pendingSize = 0;
 
-    // We no longer keep ALL raw chunks in memory to avoid OOM.
-    // We only keep the chunks we've already converted to Blobs (flushed)
-    // plus the current pending buffer.
-    // OPTIMIZATION: If IDB is enabled, we DO NOT populate this array to save RAM.
-    const downloadedChunks: (Blob | Uint8Array)[] = this.isIDBDisabled ? [...chunks] : [];
+      // Process stream
+      let chunkIndex = chunks.length;
 
-    // Flag to disable IDB writes if we hit a quota error (e.g. Incognito)
-    // No local flag needed, use class-level property
+      // Buffer for saving chunks to IDB less frequently (optimization)
+      let pendingChunks: Uint8Array[] = [];
+      let pendingSize = 0;
 
-    const flushBuffer = async () => {
-      if (pendingChunks.length === 0) return;
-      const mergedBlob = new Blob(pendingChunks as BlobPart[]);
+      // We no longer keep ALL raw chunks in memory to avoid OOM.
+      // We only keep the chunks we've already converted to Blobs (flushed)
+      // plus the current pending buffer.
+      // OPTIMIZATION: If IDB is enabled, we DO NOT populate this array to save RAM.
+      const downloadedChunks: (Blob | Uint8Array)[] = this.isIDBDisabled ? [...chunks] : [];
 
-      // Save valid chunk to IDB (best effort)
-      if (!this.isIDBDisabled) {
-        try {
-          await saveChunk(url, mergedBlob, totalSize, chunkIndex++, etag);
-        } catch (error) {
-          console.warn('[DownloadManager] Failed to save chunk to IndexedDB (likely quota exceeded).', error);
+      // Flag to disable IDB writes if we hit a quota error (e.g. Incognito)
+      // No local flag needed, use class-level property
 
-          // Check lock
-          if (!this.isIDBDisabled) {
-            // If another download already triggered the dialog, wait for it
-            if (this.quotaDialogPromise) {
-              const shouldContinue = await this.quotaDialogPromise;
-              if (!shouldContinue) {
-                throw new Error('Download aborted by user due to storage quota limits.');
-              }
-              // If resolved true, isIDBDisabled should have been set to true by the first caller,
-              // but let's be safe and fall through.
-            } else {
-              // We are the first to hit the error
-              if (this.quotaErrorHandler) {
-                this.quotaDialogPromise = this.quotaErrorHandler();
+      const flushBuffer = async () => {
+        if (pendingChunks.length === 0) return;
+        const mergedBlob = new Blob(pendingChunks as BlobPart[]);
+
+        // Save valid chunk to IDB (best effort)
+        if (!this.isIDBDisabled) {
+          try {
+            await saveChunk(url, mergedBlob, totalSize, chunkIndex++, etag);
+          } catch (error) {
+            console.warn('[DownloadManager] Failed to save chunk to IndexedDB (likely quota exceeded).', error);
+
+            // Check lock
+            if (!this.isIDBDisabled) {
+              // If another download already triggered the dialog, wait for it
+              if (this.quotaDialogPromise) {
                 const shouldContinue = await this.quotaDialogPromise;
-                this.quotaDialogPromise = null; // Release lock
-
                 if (!shouldContinue) {
                   throw new Error('Download aborted by user due to storage quota limits.');
                 }
-
-                // User chose to continue in memory -> Disable globally for this session
-                this.isIDBDisabled = true;
-                console.warn('[DownloadManager] Continuing ALL downloads in memory-only mode.');
+                // If resolved true, isIDBDisabled should have been set to true by the first caller,
+                // but let's be safe and fall through.
               } else {
-                // No handler? Default to memory mode silently? 
-                // Or warn. Let's warn and disable.
-                console.warn('[DownloadManager] No quota handler set. Defaulting to memory-only mode.');
-                this.isIDBDisabled = true;
+                // We are the first to hit the error
+                if (this.quotaErrorHandler) {
+                  this.quotaDialogPromise = this.quotaErrorHandler();
+                  const shouldContinue = await this.quotaDialogPromise;
+                  this.quotaDialogPromise = null; // Release lock
+
+                  if (!shouldContinue) {
+                    throw new Error('Download aborted by user due to storage quota limits.');
+                  }
+
+                  // User chose to continue in memory -> Disable globally for this session
+                  this.isIDBDisabled = true;
+                  console.warn('[DownloadManager] Continuing ALL downloads in memory-only mode.');
+                } else {
+                  // No handler? Default to memory mode silently? 
+                  // Or warn. Let's warn and disable.
+                  console.warn('[DownloadManager] No quota handler set. Defaulting to memory-only mode.');
+                  this.isIDBDisabled = true;
+                }
               }
+            } else {
+              // Already disabled, just skip saving
             }
-          } else {
-            // Already disabled, just skip saving
+          }
+        }
+
+        // Add to our final list of blobs - CRITICAL: This must happen even if IDB fails
+        if (this.isIDBDisabled) {
+          downloadedChunks.push(mergedBlob);
+        }
+
+        // Clear RAM buffer
+        pendingChunks = [];
+        pendingSize = 0;
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+
+        if (done) {
+          await flushBuffer();
+          break;
+        }
+
+        if (value) {
+          receivedLength += value.length;
+
+          // Don't push to 'chunks' array anymore, just the pending buffer
+          pendingChunks.push(value);
+          pendingSize += value.byteLength;
+
+          if (pendingSize >= this.BUFFER_THRESHOLD) {
+            await flushBuffer();
+          }
+
+          if (onProgress) {
+            onProgress({
+              file: url.split('/').pop() || 'file',
+              loaded: receivedLength,
+              total: totalSize
+            });
           }
         }
       }
-
-      // Add to our final list of blobs - CRITICAL: This must happen even if IDB fails
-      if (this.isIDBDisabled) {
-        downloadedChunks.push(mergedBlob);
-      }
-
-      // Clear RAM buffer
-      pendingChunks = [];
-      pendingSize = 0;
-    };
-
-    while (true) {
-      const { done, value } = await reader.read();
-
-      if (done) {
-        await flushBuffer();
-        break;
-      }
-
-      if (value) {
-        receivedLength += value.length;
-
-        // Don't push to 'chunks' array anymore, just the pending buffer
-        pendingChunks.push(value);
-        pendingSize += value.byteLength;
-
-        if (pendingSize >= this.BUFFER_THRESHOLD) {
-          await flushBuffer();
-        }
-
-        if (onProgress) {
-          onProgress({
-            file: url.split('/').pop() || 'file',
-            loaded: receivedLength,
-            total: totalSize
-          });
-        }
-      }
-    }
+    } // End if (!isComplete)
 
     console.log(`[DownloadManager] Download complete for ${url}. Assembling and caching...`);
 
     // Validation: Ensure we actually received the full file
-    if (totalSize > 0 && receivedLength !== totalSize) {
-      throw new Error(`Download incomplete for ${url}. Expected ${totalSize} bytes, received ${receivedLength}.`);
+    // Validation: Ensure we actually received the full file
+    // If complete (416 code path), receivedLength might not be updated, but startByte is totalSize.
+    const finalLength = isComplete ? startByte : receivedLength;
+    if (totalSize > 0 && finalLength !== totalSize) {
+      throw new Error(`Download incomplete for ${url}. Expected ${totalSize} bytes, received ${finalLength}.`);
     }
 
     // 4. Assemble and store in Cache API

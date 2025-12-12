@@ -68,8 +68,19 @@ export class ModelLoader {
 
     if (onProgress) onProgress(`Loading models...`, 0);
 
-    // Download sequentially to avoid OOM
-    const downloadPromises = commonFiles.map(async (file) => {
+    // Some mobile devices crash if both ONNX files download in parallel.
+    const shouldThrottleDownloads = () => {
+      if (typeof navigator === 'undefined') return false;
+      const deviceMemory = (navigator as Navigator & { deviceMemory?: number }).deviceMemory;
+      if (typeof deviceMemory === 'number') {
+        // Treat <= 4GB devices as "low memory" and throttle.
+        return deviceMemory <= 4;
+      }
+      // Fallback heuristic: assume mobile UAs need throttling.
+      return /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent || '');
+    };
+
+    const runDownload = async (file: string) => {
       const fileUrl = `https://huggingface.co/${modelId}/resolve/main/${file}`;
       try {
         await downloadManager.downloadFile(fileUrl, (p) => {
@@ -79,9 +90,15 @@ export class ModelLoader {
       } catch (e) {
         console.warn(`[ModelLoader] Pre-download skipped for ${file}:`, e);
       }
-    });
+    };
 
-    await Promise.all(downloadPromises);
+    if (shouldThrottleDownloads()) {
+      for (const file of commonFiles) {
+        await runDownload(file);
+      }
+    } else {
+      await Promise.all(commonFiles.map((file) => runDownload(file)));
+    }
   }
 
   public async loadModelWithFallback(

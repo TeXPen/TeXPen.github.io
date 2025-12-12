@@ -403,7 +403,7 @@ export class DownloadManager {
 
   /**
    * Checks if a file exists in the cache and if its size matches the Content-Length header.
-   * Also performs a SHA-256 checksum calculation to ensure the file is readable and consistent.
+   * Streams the cached response to avoid loading multi-hundred-MB blobs into memory at once.
    */
   public async checkCacheIntegrity(url: string): Promise<{ ok: boolean, reason?: string, missing?: boolean }> {
     // @ts-expect-error - env.cacheName exists in runtime but is missing from type definitions
@@ -417,39 +417,49 @@ export class DownloadManager {
 
     const contentLength = cachedResponse.headers.get('Content-Length');
     const expectedSize = contentLength ? parseInt(contentLength, 10) : 0;
-    const actualBlob = await cachedResponse.clone().blob();
+    const actualSize = await this.measureResponseSize(cachedResponse.clone());
 
-    if (actualBlob.size === 0 && expectedSize > 0) {
+    if (actualSize === 0 && expectedSize > 0) {
       return {
         ok: false,
         reason: 'File is empty (0 bytes)'
       };
-    } else if (expectedSize > 0 && actualBlob.size !== expectedSize) {
+    } else if (expectedSize > 0 && actualSize !== expectedSize) {
       return {
         ok: false,
-        reason: `Size mismatch: expected ${expectedSize}, got ${actualBlob.size}`
+        reason: `Size mismatch: expected ${expectedSize}, got ${actualSize}`
       };
-    }
-
-    // Perform a full read and checksum to ensure file integrity
-    try {
-      await this.computeChecksum(actualBlob);
-    } catch (e) {
+    } else if (actualSize === 0) {
       return {
         ok: false,
-        reason: `Checksum calculation failed (unreadable file): ${e}`
+        reason: 'File is empty (0 bytes)'
       };
     }
 
     return { ok: true };
   }
 
-  private async computeChecksum(blob: Blob): Promise<string> {
-    const arrayBuffer = await blob.arrayBuffer();
-    const hashBuffer = await crypto.subtle.digest('SHA-256', arrayBuffer);
-    const hashArray = Array.from(new Uint8Array(hashBuffer));
-    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-    return hashHex;
+  private async measureResponseSize(response: Response): Promise<number> {
+    if (!response.body) {
+      // Should not happen for cloned responses, but fallback to blob()
+      const blob = await response.blob();
+      return blob.size;
+    }
+
+    const reader = response.body.getReader();
+    let total = 0;
+
+    // Stream through the entire body without retaining previous chunks
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      if (value) {
+        total += value.byteLength;
+      }
+    }
+
+    reader.releaseLock();
+    return total;
   }
 
   public async deleteFromCache(url: string): Promise<void> {

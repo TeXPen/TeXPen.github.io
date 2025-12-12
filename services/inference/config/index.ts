@@ -35,7 +35,7 @@ export function getSessionOptions(device: string, dtype: string) {
   };
 }
 
-export function getGenerationConfig(dtype: string, tokenizer: any) {
+export function getGenerationConfig(dtype: string, tokenizer: { pad_token_id: number; eos_token_id: number; bos_token_id: number; }) {
   return {
     max_new_tokens: GENERATION_CONFIG.MAX_NEW_TOKENS,
     do_sample: GENERATION_CONFIG.DO_SAMPLE,

@@ -1,7 +1,7 @@
 import React from 'react';
-import { AppProvider } from './contexts/AppContext';
-import { ThemeProvider } from './contexts/ThemeContext';
-import { HistoryProvider } from './contexts/HistoryContext';
+import { AppProvider } from './contexts/AppProvider';
+import { ThemeProvider } from './contexts/ThemeProvider';
+import { HistoryProvider } from './contexts/HistoryProvider';
 import Main from './components/layout/Main';
 
 const App: React.FC = () => {

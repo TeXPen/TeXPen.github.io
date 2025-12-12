@@ -240,7 +240,7 @@ export class InferenceService {
     let pixelValues: Tensor | null = null;
     let debugImage = "";
 
-    const isDev = (import.meta as any).env?.DEV ?? false;
+    const isDev = (import.meta as unknown as { env: { DEV: boolean } }).env?.DEV ?? false;
     const timings: {
       preprocess?: number;
       generation?: number;
@@ -314,10 +314,11 @@ export class InferenceService {
         candidates: processedCandidates,
         debugImage,
       });
-    } catch (e: any) {
-      if (e.message === "Skipped") {
-        req.reject(e);
-      } else if (e.message === "Aborted" || signal.aborted) {
+    } catch (e) {
+      const err = e as Error;
+      if (err.message === "Skipped") {
+        req.reject(err);
+      } else if (err.message === "Aborted" || signal.aborted) {
         console.warn("[InferenceService] Inference aborted.");
         req.reject(new Error("Aborted"));
       } else {
@@ -332,12 +333,12 @@ export class InferenceService {
 
   private async generateCandidates(
     pixelValues: Tensor,
-    generationConfig: any,
+    generationConfig: ReturnType<typeof getGenerationConfig>,
     repetitionPenalty: number,
     options: SamplingOptions,
     signal: AbortSignal
   ): Promise<string[]> {
-    const isDev = (import.meta as any).env?.DEV ?? false;
+    const isDev = (import.meta as unknown as { env: { DEV: boolean } }).env?.DEV ?? false;
     let candidates: string[] = [];
 
     const doSample = options.do_sample || false;
@@ -359,7 +360,7 @@ export class InferenceService {
     const useGenerate = (doSample && effectiveNumBeams > 1) || effectiveNumBeams === 1;
 
     if (useGenerate) {
-      const generateOptions: any = {
+      const generateOptions: Record<string, unknown> = {
         inputs: pixelValues,
         max_new_tokens: generationConfig.max_new_tokens,
         repetition_penalty: repetitionPenalty,
@@ -512,7 +513,7 @@ function getOrCreateInstance(): InferenceService {
   // In browser, use window-based singleton
   if (typeof window !== "undefined") {
     if (!window.__texpen_inference_service__) {
-      window.__texpen_inference_service__ = new (InferenceService as any)();
+      window.__texpen_inference_service__ = new (InferenceService as unknown as new () => InferenceService)();
     }
     return window.__texpen_inference_service__;
   }
@@ -540,8 +541,8 @@ if (typeof window !== "undefined") {
 }
 
 // HMR Cleanup - dispose the model when this module is hot-reloaded
-if ((import.meta as any).hot) {
-  (import.meta as any).hot.dispose(() => {
+if ((import.meta as unknown as { hot: { dispose: (cb: () => void) => void } }).hot) {
+  (import.meta as unknown as { hot: { dispose: (cb: () => void) => void } }).hot.dispose(() => {
     getOrCreateInstance().dispose(true);
   });
 }

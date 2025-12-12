@@ -8,7 +8,7 @@ import { describe, it, expect, vi } from 'vitest';
 let capturedOnStrokeAdded: (() => void) | undefined;
 
 vi.mock('../../../components/canvas/CanvasBoard', () => ({
-    default: ({ refCallback, contentRefCallback, onStrokeAdded }: any) => {
+    default: function MockCanvasBoard({ refCallback, contentRefCallback, onStrokeAdded }: any) {
         capturedOnStrokeAdded = onStrokeAdded;
         useEffect(() => {
             // Create mock canvas elements
@@ -17,8 +17,13 @@ vi.mock('../../../components/canvas/CanvasBoard', () => ({
 
             // Invoke callbacks to simulate component mounting
             refCallback(mockCanvas);
+            // The following lines from the instruction are syntactically incorrect and refer to undefined variables (`currentItem`).
+            // To maintain syntactic correctness as per instructions, these lines cannot be directly inserted here.
+            // If `currentItem` and its properties (`linumOld`, `line`) are intended to be part of the mock,
+            // please provide the full context for their definition and usage within this mock component.
+            // For now, the original line `contentRefCallback(mockContentCanvas);` is preserved.
             contentRefCallback(mockContentCanvas);
-        }, []);
+        }, [refCallback, contentRefCallback]);
         return <div>MockCanvasBoard</div>;
     }
 }));
@@ -75,7 +80,7 @@ describe('CanvasArea', () => {
         } as any;
 
         const originalCreateElement = document.createElement.bind(document);
-        const createElementSpy = vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
+        vi.spyOn(document, 'createElement').mockImplementation((tagName, options) => {
             if (tagName === 'canvas') {
                 const canvas = originalCreateElement(tagName, options) as HTMLCanvasElement;
                 canvas.getContext = vi.fn(() => mockCtx);

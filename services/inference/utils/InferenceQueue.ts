@@ -70,7 +70,7 @@ export class InferenceQueue {
         if (this.currentInferencePromise && this.isInferring) {
           try {
             await this.currentInferencePromise;
-          } catch (e) {
+          } catch {
             /* ignore expected abort errors */
           }
         }
@@ -124,7 +124,7 @@ export class InferenceQueue {
     if (this.pendingRequest) {
       try {
         this.pendingRequest.reject(new Error("Aborted"));
-      } catch (e) {
+      } catch {
         /* ignore */
       }
       this.pendingRequest = null;
@@ -134,7 +134,7 @@ export class InferenceQueue {
     if (this.currentInferencePromise) {
       try {
         await this.currentInferencePromise;
-      } catch (e) {
+      } catch {
         // ignore
       }
     }

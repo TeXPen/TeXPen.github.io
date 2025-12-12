@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach, beforeAll, afterAll } from 'vitest';
 import { DownloadManager } from '../../../services/downloader/DownloadManager';
-import { getPartialDownload } from '../../../services/downloader/db';
+
 
 // Mock DB
 vi.mock('../../../services/downloader/db', () => ({
@@ -11,7 +11,7 @@ vi.mock('../../../services/downloader/db', () => ({
 }));
 
 // Access mocked functions
-import { saveChunk, getDB, getPartialDownload as mockGetPartial, clearPartialDownload as mockClearPartial } from '../../../services/downloader/db';
+import { saveChunk, getDB, getPartialDownload as mockGetPartial } from '../../../services/downloader/db';
 
 describe('DownloadManager', () => {
   let downloadManager: DownloadManager;
@@ -225,7 +225,7 @@ describe('DownloadManager', () => {
 
   it('should detect and heal corrupted (size mismatch) cache', async () => {
     const mockUrl = 'https://example.com/corrupt.file';
-    const mockSize = 100;
+
 
     // Mock cache returning a BAD response
     // Content-Length says 100, but Blob size is 50 (truncated)
@@ -326,7 +326,7 @@ describe('DownloadManager', () => {
     let maxRunning = 0;
 
     // Mock fetch to track concurrency
-    (global.fetch as any).mockImplementation(async (url: string) => {
+    (global.fetch as any).mockImplementation(async (_url: string) => {
       runningCount++;
       maxRunning = Math.max(maxRunning, runningCount);
       await new Promise(resolve => setTimeout(resolve, 50)); // Hold connection
@@ -408,7 +408,6 @@ describe('DownloadManager', () => {
 
   it('should throw error if download stream ends prematurely (size mismatch)', async () => {
     const mockUrl = 'https://example.com/incomplete.file';
-    const totalSize = 100;
 
     // Simulate stream that ends after 50 bytes
     const mockContent = new Uint8Array(50).fill(1);
@@ -438,7 +437,6 @@ describe('DownloadManager', () => {
 
   it('should continue download in memory if IDB write fails (e.g. Incognito/Quota)', async () => {
     const mockUrl = 'https://example.com/incognito.file';
-    const totalSize = 20;
 
     // Mock saveChunk to throw error
     (saveChunk as any).mockRejectedValue(new Error('QuotaExceededError'));

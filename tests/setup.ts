@@ -23,12 +23,12 @@ afterEach(() => {
 if (typeof window === 'undefined') {
   (global as any).window = global;
   (global as any).self = global;
-  (global as any).window.addEventListener = (type: string, listener: any) => { };
-  (global as any).window.removeEventListener = (type: string, listener: any) => { };
+  (global as any).window.addEventListener = (_type: string, _listener: any) => { };
+  (global as any).window.removeEventListener = (_type: string, _listener: any) => { };
   (global as any).sessionStorage = {
-    getItem: (key: string) => null,
-    setItem: (key: string, value: string) => { },
-    removeItem: (key: string) => { },
+    getItem: (_key: string) => null,
+    setItem: (_key: string, _value: string) => { },
+    removeItem: (_key: string) => { },
     clear: () => { }
   };
   (global as any).localStorage = {
@@ -86,11 +86,11 @@ const originalCreateElement = (global as any).document.createElement.bind((globa
   if (tagName.toLowerCase() === 'canvas') {
     const canvas = createCanvas(1, 1) as any;
     // Mock toDataURL
-    canvas.toDataURL = (type?: string, quality?: number) => {
+    canvas.toDataURL = (_type?: string, _quality?: number) => {
       return "data:image/png;base64,mock";
     };
     // Mock toBlob
-    canvas.toBlob = (callback: any, type?: any, quality?: any) => {
+    canvas.toBlob = (callback: any, _type?: any, _quality?: any) => {
       callback(new Blob(['mock'], { type: 'image/png' }));
     }
     // Mock getContext to handle willReadFrequently arg which napi-rs might warn about or not support fully matching browser signature

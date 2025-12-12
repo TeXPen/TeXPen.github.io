@@ -26,13 +26,13 @@ export class BeamSearch {
     repetitionPenalty: number = 1.0,
     forcedDecoderStartTokenId?: number
   ): Promise<string[]> {
-    const cfg = (this.model as any).config ?? {};
+    const cfg = (this.model.config as Record<string, unknown> | undefined) ?? {};
     const eosTokenId =
-      (cfg.eos_token_id as number | undefined) ??
+      (cfg['eos_token_id'] as number | undefined) ??
       (this.tokenizer.eos_token_id as number);
     const bosTokenId =
       forcedDecoderStartTokenId ??
-      (cfg.decoder_start_token_id as number | undefined) ??
+      (cfg['decoder_start_token_id'] as number | undefined) ??
       (this.tokenizer.bos_token_id as number | undefined) ??
       eosTokenId;
 
@@ -50,7 +50,7 @@ export class BeamSearch {
     // 1. Encoder
     logToWindow("[BeamSearch] Running encoder...");
     const encoderOutputs = await runEncoder(this.model, pixelValues);
-    const encoderHiddenStates = encoderOutputs.last_hidden_state;
+    const encoderHiddenStates = encoderOutputs['last_hidden_state'];
 
     // 2. Initialize beams
     let beams: BeamState[] = [
@@ -187,7 +187,7 @@ export class BeamSearch {
 
           const text = this.tokenizer.decode(tokens, { skip_special_tokens: false }).trim();
           if (text && !texts.includes(text)) texts.push(text);
-        } catch (e) { }
+        } catch { /* ignore */ }
       }
     }
 

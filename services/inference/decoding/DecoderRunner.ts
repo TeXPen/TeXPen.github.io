@@ -22,8 +22,6 @@ export class DecoderRunner {
 
   async run(inputs: DecoderInputs): Promise<DecoderOutputs> {
     const {
-      pixel_values,
-      encoder_outputs,
       encoder_hidden_states,
       decoder_input_ids,
       past_key_values,
@@ -32,8 +30,9 @@ export class DecoderRunner {
 
 
 
-    const sessions = (this.model as any).sessions;
-    const decoderSession = sessions.decoder_model_merged || sessions.decoder;
+
+    const sessions = this.model.sessions ?? {};
+    const decoderSession = sessions['decoder_model_merged'] || sessions['decoder'];
 
     if (!decoderSession) {
       throw new Error(
@@ -41,7 +40,7 @@ export class DecoderRunner {
       );
     }
 
-    const inputNames = decoderSession.inputNames || [];
+    const inputNames = (decoderSession as any).inputNames || [];
     const runInputs: any = {
       encoder_hidden_states: encoder_hidden_states,
     };
@@ -62,15 +61,15 @@ export class DecoderRunner {
     }
 
     const batchSize = decoder_input_ids.dims[0];
-    const cfg = (this.model as any).config ?? {};
-    const decoderCfg = cfg.decoder || cfg;
+    const cfg = this.model.config ?? {};
+    const decoderCfg = (cfg['decoder'] as Record<string, unknown>) || cfg;
 
     // Fill missing past_key_values with empty tensors for step 0
     // This happens if inputs are missing OR if an upstream step produced 'batch 0' results that were dropped
     for (const name of inputNames) {
       if (name.startsWith("past_key_values.") && !runInputs[name]) {
-        const numHeads = decoderCfg.decoder_attention_heads || decoderCfg.num_attention_heads || cfg.num_attention_heads || 16;
-        const hiddenSize = decoderCfg.d_model || decoderCfg.hidden_size || cfg.hidden_size || 1024;
+        const numHeads = (decoderCfg['decoder_attention_heads'] as number) || (decoderCfg['num_attention_heads'] as number) || (cfg['num_attention_heads'] as number) || 16;
+        const hiddenSize = (decoderCfg['d_model'] as number) || (decoderCfg['hidden_size'] as number) || (cfg['hidden_size'] as number) || 1024;
         let headDim = Math.floor(hiddenSize / numHeads);
         if (numHeads === 16 && headDim === 48) headDim = 64;
 

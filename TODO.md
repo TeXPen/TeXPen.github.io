@@ -8,7 +8,6 @@ Behavior
 Features
 
 Visuals
-- [ ] The settings dropdown in UI is too long, gets truncated
 
 Maintenance
 

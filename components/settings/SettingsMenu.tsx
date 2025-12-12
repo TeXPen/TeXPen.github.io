@@ -103,7 +103,7 @@ export const SettingsMenu: React.FC = () => {
 
                 {/* Dropdown Menu */}
                 {isSettingsOpen && (
-                    <div className="absolute right-0 top-full mt-3 w-64 bg-white dark:bg-[#111] border border-black/10 dark:border-white/10 rounded-2xl shadow-xl backdrop-blur-xl z-50 p-2 flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
+                    <div className="absolute right-0 top-full mt-3 w-64 max-h-[80vh] overflow-y-auto bg-white dark:bg-[#111] border border-black/10 dark:border-white/10 rounded-2xl shadow-xl backdrop-blur-xl z-50 p-2 flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-200 origin-top-right">
 
                         {/* Theme */}
                         <button

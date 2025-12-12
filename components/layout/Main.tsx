@@ -8,7 +8,7 @@ import Header from './Header';
 import HistorySidebar from './HistorySidebar';
 import LoadingOverlay from '../common/LoadingOverlay';
 import { ProgressToast } from '../common/ProgressToast';
-import VisualDebugger from '../debug/VisualDebugger';
+import PreviewModelInput from '../debug/PreviewModelInput';
 import DrawTab from './DrawTab';
 import UploadTab from './UploadTab';
 import { MobileBottomNav } from './MobileBottomNav';
@@ -29,7 +29,7 @@ const Main: React.FC = () => {
         loadFromHistory,
         isSidebarOpen,
         debugImage,
-        showVisualDebugger,
+        showPreviewInput,
         activeTab,
         setActiveTab,
         sessionId,
@@ -212,8 +212,8 @@ const Main: React.FC = () => {
                 </div>
             </div>
 
-            {/* Visual Debugger */}
-            {showVisualDebugger && <VisualDebugger debugImage={debugImage} />}
+            {/* Preview Model Input */}
+            {showPreviewInput && <PreviewModelInput debugImage={debugImage} />}
 
             {/* Download Prompt / Error Overlay */}
             {showFullOverlay && (

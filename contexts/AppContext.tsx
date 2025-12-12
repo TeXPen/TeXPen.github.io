@@ -49,8 +49,8 @@ export interface AppContextType {
 
     isLoadedFromCache: boolean;
     isInitialized: boolean;
-    showVisualDebugger: boolean;
-    setShowVisualDebugger: (show: boolean) => void;
+    showPreviewInput: boolean;
+    setShowPreviewInput: (show: boolean) => void;
 
     // Settings
     isSettingsOpen: boolean;
@@ -229,7 +229,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
         return true;
     });
-    const [showVisualDebugger, setShowVisualDebugger] = useState(false);
+    const [showPreviewInput, setShowPreviewInput] = useState(false);
     const [sessionId, setSessionId] = useState<string>(Date.now().toString());
 
     // Settings State
@@ -332,8 +332,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setCustomModelId,
         isLoadedFromCache,
         isInitialized,
-        showVisualDebugger,
-        setShowVisualDebugger,
+        showPreviewInput,
+        setShowPreviewInput,
 
         // Settings
         isSettingsOpen,

@@ -19,8 +19,8 @@ export const SettingsMenu: React.FC = () => {
         setQuantization,
         provider,
         setProvider,
-        showVisualDebugger,
-        setShowVisualDebugger,
+        showPreviewInput,
+        setShowPreviewInput,
         customModelId,
         setCustomModelId,
         isSettingsOpen,
@@ -386,14 +386,14 @@ export const SettingsMenu: React.FC = () => {
 
                         <div className="h-px bg-black/5 dark:bg-white/5 mx-2" />
 
-                        {/* Visual Debugger */}
+                        {/* Preview Model Input */}
                         <button
-                            onClick={() => setShowVisualDebugger(!showVisualDebugger)}
+                            onClick={() => setShowPreviewInput(!showPreviewInput)}
                             className="flex items-center justify-between p-3 rounded-xl hover:bg-black/5 dark:hover:bg-white/5 transition-colors text-sm text-slate-700 dark:text-white"
                         >
-                            <span className="font-medium">Visual Debugger</span>
-                            <div className={`w-10 h-5 rounded-full relative transition-colors ${showVisualDebugger ? 'bg-cyan-500' : 'bg-slate-200 dark:bg-white/10'}`}>
-                                <div className={`absolute top-1 w-3 h-3 rounded-full bg-white shadow-sm transition-transform ${showVisualDebugger ? 'left-6' : 'left-1'}`} />
+                            <span className="font-medium">Preview Model Input</span>
+                            <div className={`w-10 h-5 rounded-full relative transition-colors ${showPreviewInput ? 'bg-cyan-500' : 'bg-slate-200 dark:bg-white/10'}`}>
+                                <div className={`absolute top-1 w-3 h-3 rounded-full bg-white shadow-sm transition-transform ${showPreviewInput ? 'left-6' : 'left-1'}`} />
                             </div>
                         </button>
 

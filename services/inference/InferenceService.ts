@@ -398,7 +398,7 @@ export class InferenceService {
         // We intentionally DO NOT set do_sample=true if effectiveNumBeams=1 to force greedy optimization.
 
 
-        const outputTokenIds = await this.model!.generate(generateOptions);
+        const outputTokenIds = await this.model!.generate(generateOptions) as Tensor;
         const decoded = this.tokenizer!.batch_decode(outputTokenIds, {
           skip_special_tokens: true,
         });

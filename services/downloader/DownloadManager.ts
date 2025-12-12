@@ -238,23 +238,24 @@ export class DownloadManager {
 
     let receivedLength = currentTotal;
 
+    let chunkIndex = chunks.length;
+
+    // We no longer keep ALL raw chunks in memory to avoid OOM.
+    // We only keep the chunks we've already converted to Blobs (flushed)
+    // plus the current pending buffer.
+    // OPTIMIZATION: If IDB is enabled, we DO NOT populate this array to save RAM.
+    const downloadedChunks: (Blob | Uint8Array)[] = this.isIDBDisabled ? [...chunks] : [];
+
     if (!isComplete) {
       const reader = response.body?.getReader();
       if (!reader) throw new Error('Response body is null');
 
 
       // Process stream
-      let chunkIndex = chunks.length;
 
       // Buffer for saving chunks to IDB less frequently (optimization)
       let pendingChunks: Uint8Array[] = [];
       let pendingSize = 0;
-
-      // We no longer keep ALL raw chunks in memory to avoid OOM.
-      // We only keep the chunks we've already converted to Blobs (flushed)
-      // plus the current pending buffer.
-      // OPTIMIZATION: If IDB is enabled, we DO NOT populate this array to save RAM.
-      const downloadedChunks: (Blob | Uint8Array)[] = this.isIDBDisabled ? [...chunks] : [];
 
       // Flag to disable IDB writes if we hit a quota error (e.g. Incognito)
       // No local flag needed, use class-level property

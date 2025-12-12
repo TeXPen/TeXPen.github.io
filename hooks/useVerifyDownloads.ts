@@ -16,7 +16,7 @@ export const useVerifyDownloads = () => {
     const { downloadManager } = await import('../services/downloader/DownloadManager');
     const { getSessionOptions } = await import('../services/inference/config');
 
-    const toast = (msg: string | null | { message: string, progress?: number }) => {
+    const toast = (msg: string | null | { message: string, progress?: number, isLoading?: boolean }) => {
       if (typeof msg === 'string') {
         setCustomNotification({ message: msg });
       } else {
@@ -29,7 +29,7 @@ export const useVerifyDownloads = () => {
         toast('Verifying files...');
         // Get options for current custom ID or default
         const modelId = customModelId || MODEL_CONFIG.ID;
-        const sessionOptions = getSessionOptions(provider, quantization || MODEL_CONFIG.DEFAULT_QUANTIZATION);
+        const sessionOptions = getSessionOptions(provider); // Removed quantization arg
 
         const corrupted = await modelLoader.validateModelFiles(modelId, sessionOptions);
 
@@ -49,17 +49,17 @@ export const useVerifyDownloads = () => {
               await modelLoader.preDownloadModels(modelId, sessionOptions, (status, progress) => {
                 toast({ message: status, progress });
               });
-              toast('Repaired corrupted files!');
+              toast({ message: 'Repaired corrupted files!', isLoading: false });
               setTimeout(() => toast(null), 3000);
             }
           });
         } else {
-          toast('All files verified successfully.');
+          toast({ message: 'All files verified successfully.', isLoading: false });
           setTimeout(() => toast(null), 3000);
         }
       } catch (e) {
         console.error(e);
-        toast('Error detecting corruption. Check console.');
+        toast({ message: 'Error detecting corruption. Check console.', isLoading: false });
         setTimeout(() => toast(null), 5000);
       }
     };

@@ -4,9 +4,10 @@ interface ProgressToastProps {
     phase: string;
     progress: number;
     isQueued?: boolean;
+    isLoading?: boolean;
 }
 
-export const ProgressToast: React.FC<ProgressToastProps> = ({ phase, progress, isQueued }) => {
+export const ProgressToast: React.FC<ProgressToastProps> = ({ phase, progress, isQueued, isLoading = true }) => {
     const parts = phase.split('|');
     const isMultiLine = parts.length > 1;
 
@@ -21,10 +22,12 @@ export const ProgressToast: React.FC<ProgressToastProps> = ({ phase, progress, i
             )}
 
             <div className={`px-6 py-3 bg-white/90 dark:bg-[#111]/90 backdrop-blur-md border border-cyan-500/30 dark:border-cyan-400/30 ${isMultiLine ? 'rounded-2xl' : 'rounded-full'} flex items-center gap-3 shadow-xl pointer-events-auto animate-in slide-in-from-bottom-5 duration-300`}>
-                <div className="relative w-4 h-4 flex-none self-center">
-                    <div className="absolute inset-0 border-2 border-cyan-500/30 rounded-full"></div>
-                    <div className="absolute inset-0 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
-                </div>
+                {isLoading && (
+                    <div className="relative w-4 h-4 flex-none self-center">
+                        <div className="absolute inset-0 border-2 border-cyan-500/30 rounded-full"></div>
+                        <div className="absolute inset-0 border-2 border-cyan-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
+                )}
                 <div className="flex flex-col text-sm font-medium text-slate-700 dark:text-white/90 text-center min-w-[200px]">
                     {parts.map((part, i) => (
                         <span key={i} className="whitespace-nowrap">

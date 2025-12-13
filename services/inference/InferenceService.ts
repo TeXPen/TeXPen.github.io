@@ -199,7 +199,7 @@ export class InferenceService {
       // If previous page was in the middle of loading, we need a longer delay
       if (wasLoading) {
         if (onProgress)
-          onProgress("Waiting for GPU cleanup...");
+          onProgress("Waiting for cleanup...");
         await new Promise((resolve) => setTimeout(resolve, 3000));
         sessionStorage.removeItem(LOADING_KEY);
       } else if (unloadTime) {

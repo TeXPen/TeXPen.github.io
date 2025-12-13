@@ -49,11 +49,18 @@ export function useInkModel(theme: 'light' | 'dark', provider: 'webgpu' | 'wasm'
   const [status, setStatus] = useState<string>('idle'); // idle, loading, error, success
   const [isInferencing, setIsInferencing] = useState<boolean>(false);
   const activeInferenceCount = useRef<number>(0);
+  /* 
+   * Queue management for inference requests that come in while model is loading
+   * Now includes options to preserve callbacks like onPreprocess
+   */
   const pendingInferenceRef = useRef<{
     canvas: HTMLCanvasElement;
+    options?: { onPreprocess?: (debugImage: string) => void };
     resolve: (value: { latex: string; candidates: Candidate[]; debugImage: string | null } | null) => void;
     reject: (reason?: unknown) => void;
   } | null>(null);
+
+  const debounceTimeoutRef = useRef<{ timer: ReturnType<typeof setTimeout>; resolve: (value: any) => void } | null>(null);
 
   const [loadingPhase, setLoadingPhase] = useState<string>('');
   const [progress, setProgress] = useState(0);
@@ -201,7 +208,7 @@ export function useInkModel(theme: 'light' | 'dark', provider: 'webgpu' | 'wasm'
       setIsGenerationQueued(true);
 
       return new Promise<{ latex: string; candidates: Candidate[]; debugImage: string | null } | null>((resolve, reject) => {
-        pendingInferenceRef.current = { canvas, resolve, reject };
+        pendingInferenceRef.current = { canvas, options, resolve, reject };
       });
     }
 
@@ -214,55 +221,73 @@ export function useInkModel(theme: 'light' | 'dark', provider: 'webgpu' | 'wasm'
     setIsInferencing(true);
     setStatus('inferencing');
 
-    return new Promise<{ latex: string; candidates: Candidate[]; debugImage: string | null } | null>((resolve, reject) => {
-      canvas.toBlob(async (blob) => {
-        if (!blob) {
-          activeInferenceCount.current -= 1;
-          if (activeInferenceCount.current === 0) {
-            setIsInferencing(false);
-          }
-          setStatus('error');
-          return reject(new Error('Failed to create blob from canvas'));
-        }
-        try {
-          const res = await inferenceService.infer(blob, {
-            num_beams: numCandidates,
-            do_sample: doSample,
-            temperature,
-            top_k: topK,
-            top_p: topP,
-            onPreprocess: options?.onPreprocess,
-          });
-          if (res) {
-            // Map string candidates to Candidate objects
-            const newCandidates = res.candidates.map((latex, index) => ({
-              id: index,
-              latex: latex
-            }));
 
-            setStatus('success');
-            resolve({ latex: res.latex, candidates: newCandidates, debugImage: res.debugImage });
-          } else {
-            setStatus('idle');
-            resolve(null);
-          }
-        } catch (e: unknown) {
-          const err = e as Error;
-          if (err.message === 'Aborted' || err.message === 'Skipped' || err.name === 'AbortError') {
-            console.log('Inference aborted/skipped:', err.message);
-            resolve(null);
-          } else {
-            console.error('Inference error:', e);
+
+    // Debounce Logic
+
+    return new Promise<{ latex: string; candidates: Candidate[]; debugImage: string | null } | null>((resolve, reject) => {
+      // Clear any existing debounce timer and resolve its promise as null (skipped)
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current.timer);
+        debounceTimeoutRef.current.resolve(null);
+        // Since we are cancelling the previous one effectively before it started (in the debounce phase),
+        // we must decrement the counter that was incremented for it.
+        activeInferenceCount.current -= 1;
+      }
+
+      const timer = setTimeout(() => {
+        // Clear the ref as we are now executing
+        debounceTimeoutRef.current = null;
+
+        canvas.toBlob(async (blob) => {
+          if (!blob) {
+            activeInferenceCount.current -= 1;
+            if (activeInferenceCount.current === 0) setIsInferencing(false);
             setStatus('error');
-            reject(e);
+            return reject(new Error('Failed to create blob from canvas'));
           }
-        } finally {
-          activeInferenceCount.current -= 1;
-          if (activeInferenceCount.current === 0) {
-            setIsInferencing(false);
+          try {
+            const res = await inferenceService.infer(blob, {
+              num_beams: numCandidates,
+              do_sample: doSample,
+              temperature,
+              top_k: topK,
+              top_p: topP,
+              onPreprocess: options?.onPreprocess,
+            });
+            if (res) {
+              // Map string candidates to Candidate objects
+              const newCandidates = res.candidates.map((latex, index) => ({
+                id: index,
+                latex: latex
+              }));
+
+              setStatus('success');
+              resolve({ latex: res.latex, candidates: newCandidates, debugImage: res.debugImage });
+            } else {
+              // If result is null (skipped), we resolve null
+              resolve(null);
+            }
+          } catch (e: unknown) {
+            const err = e as Error;
+            if (err.message === 'Aborted' || err.message === 'Skipped' || err.name === 'AbortError') {
+              console.log('Inference aborted/skipped:', err.message);
+              resolve(null);
+            } else {
+              console.error('Inference error:', e);
+              setStatus('error');
+              reject(e);
+            }
+          } finally {
+            activeInferenceCount.current -= 1;
+            if (activeInferenceCount.current === 0) {
+              setIsInferencing(false);
+            }
           }
-        }
-      }, 'image/png');
+        }, 'image/png');
+      }, 100); // 100ms debounce
+
+      debounceTimeoutRef.current = { timer, resolve };
     });
   }, [numCandidates, doSample, temperature, topK, topP, status, userConfirmed, isLoadedFromCache]);
 
@@ -303,11 +328,11 @@ export function useInkModel(theme: 'light' | 'dark', provider: 'webgpu' | 'wasm'
   useEffect(() => {
     if (status === 'idle' && pendingInferenceRef.current) {
       console.log('[useInkModel] Processing queued inference');
-      const { canvas, resolve, reject } = pendingInferenceRef.current;
+      const { canvas, options, resolve, reject } = pendingInferenceRef.current;
       pendingInferenceRef.current = null;
       setIsGenerationQueued(false);
 
-      infer(canvas).then(resolve).catch(reject);
+      infer(canvas, options).then(resolve).catch(reject);
     }
   }, [status, infer]);
 

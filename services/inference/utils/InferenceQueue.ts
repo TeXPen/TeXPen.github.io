@@ -8,30 +8,30 @@ export type InferenceRequest = {
 };
 
 export type InferenceProcessor = (
-  req: InferenceRequest,
-  signal: AbortSignal
+  req: InferenceRequest
 ) => Promise<void>;
 
+/**
+ * A robust "Conflating Queue" for inference.
+ * - Ensures only one inference runs at a time.
+ * - If multiple requests arrive while one is running, only the LATEST one is kept. Intermediate ones are rejected immediately.
+ * - This prevents the "worker flood" and ensures the UI always shows the result of the *last* stroke.
+ */
 export class InferenceQueue {
   private pendingRequest: InferenceRequest | null = null;
-  private wakeQueuePromise: ((value: void) => void) | null = null;
-  private isProcessingQueue = false;
-
-  // Track the currently running inference to allow waiting/aborting
-  private currentInferencePromise: Promise<void> | null = null;
-  private abortController: AbortController | null = null;
-  private isInferring = false;
+  private isProcessing = false;
 
   constructor(private processor: InferenceProcessor) { }
 
   public infer(imageBlob: Blob, options: import("../types").SamplingOptions): Promise<InferenceResult> {
     return new Promise((resolve, reject) => {
-      // If there's already a pending request waiting to be picked up, cancel it
-      // (Debounce behavior: only processing the latest request matters)
+      // 1. If there is ALREADY a pending request waiting to start, it is now obsolete.
+      //    Reject it (Skipped) and replace it with this new one.
       if (this.pendingRequest) {
         this.pendingRequest.reject(new Error("Skipped"));
       }
 
+      // 2. Set this properly as the next pending request.
       this.pendingRequest = {
         blob: imageBlob,
         options,
@@ -39,110 +39,54 @@ export class InferenceQueue {
         reject,
       };
 
-      // If we are currently running an inference, abort it to prioritize this new one
-      if (this.isInferring && this.abortController) {
-        console.log(
-          "[InferenceQueue] New request while inferring. Aborting current inference immediately."
-        );
-        this.abortController.abort();
-      }
-
-      // Wake up the queue loop if it's waiting
-      if (this.wakeQueuePromise) {
-        this.wakeQueuePromise();
-        this.wakeQueuePromise = null;
-      }
-
-      // Start the loop if not running
-      if (!this.isProcessingQueue) {
-        this.processQueue();
+      // 3. Trigger processing if not already running.
+      if (!this.isProcessing) {
+        this.processNext();
       }
     });
   }
 
-  private async processQueue() {
-    this.isProcessingQueue = true;
+  private async processNext() {
+    // Safety check: if already processing, do nothing (the loop/recursion will handle it)
+    // Actually, we use a recursive-like pattern to ensure sequentiality without while loops that might hang.
+    if (this.isProcessing) return;
+
+    // If no request waiting, we are done.
+    if (!this.pendingRequest) {
+      this.isProcessing = false;
+      return;
+    }
+
+    this.isProcessing = true;
+    const req = this.pendingRequest;
+    this.pendingRequest = null; // Clear it so a new one can fill the slot
 
     try {
-      while (this.pendingRequest) {
-        // If there's a current inference still cleaning up (or technically running but we just aborted it),
-        // wait for it to finish its promise.
-        if (this.currentInferencePromise && this.isInferring) {
-          try {
-            await this.currentInferencePromise;
-          } catch {
-            /* ignore expected abort errors */
-          }
-        }
-
-        // Double check pendingRequest existence after await
-        if (!this.pendingRequest) break;
-
-        // Take the request
-        const req = this.pendingRequest;
-        this.pendingRequest = null;
-
-        this.isInferring = true;
-        this.abortController = new AbortController();
-        const signal = this.abortController.signal;
-
-        // Run the processor
-        this.currentInferencePromise = this.processor(req, signal).finally(() => {
-          this.isInferring = false;
-          this.abortController = null;
-          this.currentInferencePromise = null;
-        });
-
-        // Check if a new request came in while we were starting/running
-        if (this.pendingRequest) {
-          // Loop around immediately to handle the new pending request
-          // (The processor logic above will have been aborted via this.infer() logic triggers)
-          continue;
-        } else {
-          // Wait for the current inference to finish OR for a wake signal (new request)
-          await Promise.race([
-            this.currentInferencePromise,
-            new Promise<void>((resolve) => {
-              this.wakeQueuePromise = resolve;
-            }),
-          ]);
-        }
-      }
+      await this.processor(req);
+    } catch (error) {
+      // Processor errors should usually be handled by the processor calling req.reject,
+      // but if it throws synchronously or unexpectedly:
+      console.error("[InferenceQueue] Processor error:", error);
+      try { req.reject(error); } catch { }
     } finally {
-      this.isProcessingQueue = false;
+      this.isProcessing = false;
+      // Loop: check if a new request arrived while we were working
+      if (this.pendingRequest) {
+        this.processNext();
+      }
     }
   }
 
   public async dispose() {
-    // Abort any running inference immediately
-    if (this.abortController) {
-      this.abortController.abort();
-      this.abortController = null;
-    }
-
-    // Reject pending requests
+    // Reject any pending request
     if (this.pendingRequest) {
-      try {
-        this.pendingRequest.reject(new Error("Aborted"));
-      } catch {
-        /* ignore */
-      }
+      this.pendingRequest.reject(new Error("Aborted"));
       this.pendingRequest = null;
     }
-
-    // Wait for current inference to cleanup
-    if (this.currentInferencePromise) {
-      try {
-        await this.currentInferencePromise;
-      } catch {
-        // ignore
-      }
-    }
-
-    this.isInferring = false;
+    this.isProcessing = false;
   }
 
   public getIsInferring(): boolean {
-    return this.isInferring;
+    return this.isProcessing;
   }
 }

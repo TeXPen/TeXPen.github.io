@@ -126,32 +126,19 @@ export class InferenceService {
 
       signal.addEventListener('abort', onAbort);
 
-      // Separate options to avoid cloning issues with functions
       const { onPreprocess, ...workerOptions } = req.options;
 
-      this.pendingRequests.set(id, {
-        resolve: (data: unknown) => {
-          signal.removeEventListener('abort', onAbort);
-          req.resolve(data as InferenceResult);
-          resolve();
-        },
-        reject: (err: unknown) => {
-          signal.removeEventListener('abort', onAbort);
-          req.reject(err);
-          // resolve() or reject()? queue expects promise loop to continue? 
-          // The runInference implementation in queue handles error catching usually.
-          reject(err);
-        },
-        onPreprocess // Store for worker callback
-      });
+      // Pass explicit debug flag so worker knows whether to generate debug image
+      const workerData = {
+        blob: req.blob,
+        options: workerOptions,
+        debug: !!onPreprocess
+      };
 
       this.worker!.postMessage({
         type: 'infer',
         id,
-        data: {
-          blob: req.blob,
-          options: workerOptions
-        }
+        data: workerData
       });
     });
   }

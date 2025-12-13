@@ -16,16 +16,18 @@ self.onmessage = async (e: MessageEvent) => {
         break;
 
       case "infer": {
-        // data is { blob, options }
+        // data is { blob, options, debug }
         // We need to make sure blob is valid. Worker receives Blob.
-        const { blob, options } = data as { blob: Blob; options: SamplingOptions };
+        const { blob, options, debug } = data as { blob: Blob; options: SamplingOptions; debug?: boolean };
 
-        const optionsWithCallback = {
-          ...options,
-          onPreprocess: (debugImage: string) => {
+        const optionsWithCallback = { ...options };
+
+        // Only attach callback if main thread requested debug info
+        if (debug) {
+          optionsWithCallback.onPreprocess = (debugImage: string) => {
             self.postMessage({ type: "debug_image", id, data: debugImage });
-          }
-        };
+          };
+        }
 
         // Pass a signal if we supported aborting from main (future TODO)
         // For now, simple inference.

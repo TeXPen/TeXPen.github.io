@@ -49,7 +49,10 @@ function getOptimizedContext(canvas: HTMLCanvasElement | OffscreenCanvas): Canva
  * - OffscreenCanvas usage where supported (avoids DOM interaction)
  * - Pre-allocated Float32Array with computed constants
  */
-export async function preprocess(imageBlob: Blob): Promise<{ tensor: Tensor; debugImage: string }> {
+export async function preprocess(
+  imageBlob: Blob,
+  generateDebugImage: boolean = false
+): Promise<{ tensor: Tensor; debugImage: string }> {
   // Convert Blob to ImageBitmap
   const img = await createImageBitmap(imageBlob);
 
@@ -59,7 +62,7 @@ export async function preprocess(imageBlob: Blob): Promise<{ tensor: Tensor; deb
   ctx.drawImage(img, 0, 0);
   img.close(); // Release ImageBitmap memory early
 
-  let imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
   const pixelData = imageData.data;
 
   // OPTIMIZATION: Single-pass transparency detection AND pixel processing
@@ -67,13 +70,21 @@ export async function preprocess(imageBlob: Blob): Promise<{ tensor: Tensor; deb
   // we do a preliminary fast scan for transparency, then process in one pass
   processPixelsForModelInput(pixelData);
 
+  // Note: We don't need putImageData if we are just analyzing the pixels for trimming!
+  // BUT we modified pixelData in place (to black/white), so we technically assume subsequent steps happen on this modified data.
+  // The old code did putImageData, then read it back inside trimWhiteBorder (via a temp canvas in some impls, or just used the data).
+  // The old trimWhiteBorder took imageData and returned imageData (which implied a new clipped buffer).
+
+  // 2. Trim white border (Optimization: Return Bounds, don't create new ImageData yet)
+  // We use the modified pixelData directly.
+  const bounds = getTrimmedBounds(imageData);
+
+  // 3. Resize and Pad (Letterbox) to FIXED_IMG_SIZE direct from source ImageData + Bounds
+  // We need to put the modified pixel data back onto a canvas (or temp one) ONLY so we can draw it scaled.
+  // Since we have 'imageData' with correct pixels, we can put it back on 'canvas' (reusing it).
   ctx.putImageData(imageData, 0, 0);
 
-  // 2. Trim white border
-  imageData = trimWhiteBorder(imageData);
-
-  // 3. Resize and Pad (Letterbox) to FIXED_IMG_SIZE
-  const processedCanvas = resizeAndPad(imageData, FIXED_IMG_SIZE);
+  const processedCanvas = resizeAndPadFromBounds(canvas, bounds, FIXED_IMG_SIZE);
   const processedCtx = getOptimizedContext(processedCanvas);
   const processedData = processedCtx.getImageData(0, 0, FIXED_IMG_SIZE, FIXED_IMG_SIZE);
 
@@ -85,21 +96,17 @@ export async function preprocess(imageBlob: Blob): Promise<{ tensor: Tensor; deb
   // OPTIMIZATION: Use pre-computed constants and avoid repeated divisions
   normalizeToTensor(data, float32Data);
 
-  // Generate debug image (must use regular canvas for toDataURL or convert blob)
+  // Generate debug image ONLY if requested
   let debugImage = '';
-
-  // Check if we are using OffscreenCanvas (likely in worker or if supported)
-  if (supportsOffscreenCanvas()) {
-    // OffscreenCanvas doesn't have toDataURL, need to convert via blob
-    // Note: TypeScript might not strictly infer this is OffscreenCanvas here without casting or check,
-    // but based on createOptimizedCanvas logic, if support is true, it is OffscreenCanvas.
-    const offscreen = processedCanvas as OffscreenCanvas;
-    const blob = await offscreen.convertToBlob();
-    debugImage = await blobToDataURL(blob);
-  } else {
-    // Regular HTMLCanvasElement
-    const domCanvas = processedCanvas as HTMLCanvasElement;
-    debugImage = domCanvas.toDataURL();
+  if (generateDebugImage) {
+    if (supportsOffscreenCanvas()) {
+      const offscreen = processedCanvas as OffscreenCanvas;
+      const blob = await offscreen.convertToBlob();
+      debugImage = await blobToDataURL(blob);
+    } else {
+      const domCanvas = processedCanvas as HTMLCanvasElement;
+      debugImage = domCanvas.toDataURL();
+    }
   }
 
   return {
@@ -203,9 +210,10 @@ function normalizeToTensor(data: Uint8ClampedArray, output: Float32Array): void 
 }
 
 /**
- * Trim white border from image data.
+ * Get the bounding box of the non-white content.
+ * Returns {x, y, w, h}
  */
-function trimWhiteBorder(imageData: ImageData): ImageData {
+function getTrimmedBounds(imageData: ImageData): { x: number; y: number; w: number; h: number } {
   const { width, height, data } = imageData;
   let minX = width, minY = height, maxX = 0, maxY = 0;
   let found = false;
@@ -217,7 +225,7 @@ function trimWhiteBorder(imageData: ImageData): ImageData {
 
   const threshold = 15;
 
-  // OPTIMIZATION: Use direct array indexing instead of function calls
+  // OPTIMIZATION: Use direct array indexing
   for (let y = 0; y < height; y++) {
     const rowOffset = y * width * 4;
     for (let x = 0; x < width; x++) {
@@ -241,37 +249,35 @@ function trimWhiteBorder(imageData: ImageData): ImageData {
     }
   }
 
-  if (!found) return imageData; // Return original if empty
+  if (!found) {
+    return { x: 0, y: 0, w: width, h: height };
+  }
 
-  const w = maxX - minX + 1;
-  const h = maxY - minY + 1;
-
-  // Use optimized canvas
-  const canvas = createOptimizedCanvas(w, h);
-  const ctx = getOptimizedContext(canvas);
-
-  // Create temp canvas for source image
-  const tempCanvas = createOptimizedCanvas(width, height);
-  const tempCtx = getOptimizedContext(tempCanvas);
-  tempCtx.putImageData(imageData, 0, 0);
-
-  ctx.drawImage(tempCanvas as CanvasImageSource, minX, minY, w, h, 0, 0, w, h);
-  return ctx.getImageData(0, 0, w, h);
+  return {
+    x: minX,
+    y: minY,
+    w: maxX - minX + 1,
+    h: maxY - minY + 1
+  };
 }
 
 /**
- * Resize image and pad to target size (letterbox).
+ * Resize and pad using source canvas and clip bounds.
  */
-function resizeAndPad(imageData: ImageData, targetSize: number): HTMLCanvasElement | OffscreenCanvas {
-  const { width, height } = imageData;
+function resizeAndPadFromBounds(
+  sourceCanvas: HTMLCanvasElement | OffscreenCanvas,
+  bounds: { x: number; y: number; w: number; h: number },
+  targetSize: number
+): HTMLCanvasElement | OffscreenCanvas {
+  const { x, y, w, h } = bounds;
 
   // Python logic: v2.Resize(size=447, max_size=448)
-  const scale1 = (targetSize - 1) / Math.min(width, height);
-  const scale2 = targetSize / Math.max(width, height);
+  const scale1 = (targetSize - 1) / Math.min(w, h);
+  const scale2 = targetSize / Math.max(w, h);
   const scale = Math.min(scale1, scale2);
 
-  const newW = Math.round(width * scale);
-  const newH = Math.round(height * scale);
+  const newW = Math.round(w * scale);
+  const newH = Math.round(h * scale);
 
   const canvas = createOptimizedCanvas(targetSize, targetSize);
   const ctx = getOptimizedContext(canvas);
@@ -280,14 +286,18 @@ function resizeAndPad(imageData: ImageData, targetSize: number): HTMLCanvasEleme
   ctx.fillStyle = 'white';
   ctx.fillRect(0, 0, targetSize, targetSize);
 
-  // Create temp canvas for source
-  const tempCanvas = createOptimizedCanvas(width, height);
-  const tempCtx = getOptimizedContext(tempCanvas);
-  tempCtx.putImageData(imageData, 0, 0);
-
   ctx.imageSmoothingEnabled = true;
-  ctx.imageSmoothingQuality = 'high';
-  ctx.drawImage(tempCanvas as CanvasImageSource, 0, 0, width, height, 0, 0, newW, newH);
+
+  // OffscreenCanvas context doesn't always strictly match CanvasRenderingContext2D types in older definitions,
+  // but 'high' is standard compliant.
+  (ctx as CanvasRenderingContext2D).imageSmoothingQuality = 'high';
+
+  // Draw ONLY the clipped region from the source canvas, scaled to the new size
+  ctx.drawImage(
+    sourceCanvas as CanvasImageSource, // Works for both HTMLCanvasElement and OffscreenCanvas
+    x, y, w, h,    // Source rect
+    0, 0, newW, newH // Dest rect (top-left aligned, padding handled by just drawing there and background being white)
+  );
 
   return canvas;
 }

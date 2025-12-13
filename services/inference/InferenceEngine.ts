@@ -208,7 +208,8 @@ export class InferenceEngine {
       // 1) Preprocess image -> pixelValues
       const startPreprocess = performance.now();
       const { tensor, debugImage: dbgImg } = await preprocess(
-        imageBlob
+        imageBlob,
+        !!options.onPreprocess
       );
       pixelValues = tensor;
       debugImage = dbgImg;

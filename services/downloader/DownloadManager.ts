@@ -15,9 +15,42 @@ export class DownloadManager {
   private queue: Array<{ url: string, onProgress?: (p: DownloadProgress) => void, resolve: () => void, reject: (err: unknown) => void }> = [];
   private activeCount = 0;
   private readonly MAX_CONCURRENT_FILES = 2; // Mobile friendly limit
+  private quotaErrorHandler: (() => Promise<boolean>) | null = null;
+  private quotaErrorAcknowledged = false;
 
   private constructor() {
     this.store = new ChunkStore();
+  }
+
+  private isQuotaError(error: unknown): boolean {
+    if (error instanceof DOMException) {
+      // QuotaExceededError for Cache API, also check for IndexedDB quota errors
+      return error.name === 'QuotaExceededError' ||
+        error.code === 22 || // Legacy Safari quota error code
+        error.message.includes('quota');
+    }
+    if (error instanceof Error) {
+      return error.message.toLowerCase().includes('quota') ||
+        error.message.toLowerCase().includes('storage');
+    }
+    return false;
+  }
+
+  private async handleQuotaError(): Promise<boolean> {
+    // Only ask user once per session
+    if (this.quotaErrorAcknowledged) {
+      return true; // User already acknowledged, continue with current strategy
+    }
+
+    if (this.quotaErrorHandler) {
+      const shouldContinue = await this.quotaErrorHandler();
+      this.quotaErrorAcknowledged = true;
+      return shouldContinue;
+    }
+
+    // No handler registered, fail gracefully
+    console.warn('Quota exceeded and no handler registered');
+    return false;
   }
 
   public static getInstance(): DownloadManager {
@@ -36,8 +69,7 @@ export class DownloadManager {
   }
 
   public setQuotaErrorHandler(handler: () => Promise<boolean>) {
-    // TODO: Implement quota handling in V3
-    console.warn('Quota handling not yet implemented in V3', handler);
+    this.quotaErrorHandler = handler;
   }
 
   public async downloadFile(url: string, onProgress?: (progress: DownloadProgress) => void): Promise<void> {
@@ -121,8 +153,24 @@ export class DownloadManager {
       }
     });
 
-    await cache.put(url, response);
-    await this.store.deleteFile(url);
+    try {
+      await cache.put(url, response);
+      await this.store.deleteFile(url);
+    } catch (error) {
+      if (this.isQuotaError(error)) {
+        console.warn(`Quota exceeded when caching ${url}`, error);
+        const shouldContinue = await this.handleQuotaError();
+        if (!shouldContinue) {
+          await this.store.deleteFile(url);
+          throw new Error('Download aborted by user: storage quota exceeded');
+        }
+        // User chose to continue - file is still usable from IndexedDB but won't be in Cache API
+        // This means transformers.js won't find it automatically, but the download completed
+        console.warn('Continuing without persistent cache storage');
+      } else {
+        throw error;
+      }
+    }
   }
 
   private async computeSha256(blob: Blob): Promise<string> {

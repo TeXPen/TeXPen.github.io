@@ -61,10 +61,15 @@ export class InferenceService {
 
     this.isLoading = true;
 
+    // Capture the generation AT THE MOMENT OF CALL (not when the mutex runs)
+    // This ensures that if dispose() is called while we are waiting in the mutex queue,
+    // we will see the NEW generation when we eventually run, and abort correctly.
+    const capturedGeneration = this.disposalGeneration;
+
     // Append our actual work to the mutex chain
     const work = async () => {
       await this.runLoadingSequence(
-        this.disposalGeneration,
+        capturedGeneration, // Use the captured generation
         onProgress,
         options
       );
@@ -108,7 +113,26 @@ export class InferenceService {
             "Cannot change model settings while an inference is in progress."
           );
         }
-        await this.dispose();
+
+        // Internal reconfiguration: Dispose OLD model but do NOT increment generation.
+        // We are strictly replacing the current state within the SAME generation cycle (from our perspective),
+        // or rather, we are validating that WE are the active generation.
+
+        // 1. Clear queue
+        await this.queue.dispose();
+
+        // 2. Dispose model
+        if (this.model && "dispose" in this.model) {
+          try {
+            await this.model.dispose();
+          } catch (e) {
+            console.warn("Error disposing model during reconfiguration:", e);
+          }
+        }
+        this.model = null;
+        this.tokenizer = null;
+
+        // 3. Verify we are still valid before proceeding to load new one
         if (this.disposalGeneration !== localGeneration) {
           return;
         }

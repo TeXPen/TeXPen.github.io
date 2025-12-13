@@ -20,9 +20,16 @@ self.onmessage = async (e: MessageEvent) => {
         // We need to make sure blob is valid. Worker receives Blob.
         const { blob, options } = data as { blob: Blob; options: SamplingOptions };
 
+        const optionsWithCallback = {
+          ...options,
+          onPreprocess: (debugImage: string) => {
+            self.postMessage({ type: "debug_image", id, data: debugImage });
+          }
+        };
+
         // Pass a signal if we supported aborting from main (future TODO)
         // For now, simple inference.
-        const result = await engine.infer(blob, options);
+        const result = await engine.infer(blob, optionsWithCallback);
         self.postMessage({ type: "success", id, data: result });
         break;
       }

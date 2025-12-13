@@ -85,14 +85,21 @@ export async function preprocess(imageBlob: Blob): Promise<{ tensor: Tensor; deb
   // OPTIMIZATION: Use pre-computed constants and avoid repeated divisions
   normalizeToTensor(data, float32Data);
 
-  // Generate debug image (must use regular canvas for toDataURL)
+  // Generate debug image (must use regular canvas for toDataURL or convert blob)
   let debugImage = '';
-  if (processedCanvas instanceof HTMLCanvasElement) {
-    debugImage = processedCanvas.toDataURL();
-  } else {
-    // OffscreenCanvas doesn't have toDataURL, need to convert
-    const blob = await processedCanvas.convertToBlob();
+
+  // Check if we are using OffscreenCanvas (likely in worker or if supported)
+  if (supportsOffscreenCanvas()) {
+    // OffscreenCanvas doesn't have toDataURL, need to convert via blob
+    // Note: TypeScript might not strictly infer this is OffscreenCanvas here without casting or check,
+    // but based on createOptimizedCanvas logic, if support is true, it is OffscreenCanvas.
+    const offscreen = processedCanvas as OffscreenCanvas;
+    const blob = await offscreen.convertToBlob();
     debugImage = await blobToDataURL(blob);
+  } else {
+    // Regular HTMLCanvasElement
+    const domCanvas = processedCanvas as HTMLCanvasElement;
+    debugImage = domCanvas.toDataURL();
   }
 
   return {

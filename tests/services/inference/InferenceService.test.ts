@@ -87,7 +87,6 @@ describe('InferenceService Integration (Efficient)', () => {
 
     const options: InferenceOptions = {
       device: 'cpu' as any, // Use CPU in Node environment to avoid WASM/WebGPU errors
-      dtype: MODEL_CONFIG.QUANTIZATION.FP32
     };
 
     console.log('[Test] Starting legit initialization with mocked network...');

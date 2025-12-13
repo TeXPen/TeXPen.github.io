@@ -31,8 +31,6 @@ export interface AppContextType {
     setTopK: (n: number) => void;
     topP: number;
     setTopP: (n: number) => void;
-    quantization: string;
-    setQuantization: (q: string) => void;
     provider: Provider;
     setProvider: (p: Provider) => void;
     progress: number;

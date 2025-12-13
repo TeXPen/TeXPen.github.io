@@ -26,8 +26,6 @@ const defaultAppContext = {
     toggleSidebar: mockToggleSidebar,
     numCandidates: 3,
     setNumCandidates: mockSetNumCandidates,
-    quantization: MODEL_CONFIG.QUANTIZATION.Q8,
-    setQuantization: vi.fn(),
     provider: MODEL_CONFIG.PROVIDERS.WEBGPU,
     setProvider: vi.fn(),
     showVisualDebugger: false,

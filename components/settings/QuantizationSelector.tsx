@@ -1,17 +1,16 @@
 import React from 'react';
 import Select, { StylesConfig } from 'react-select';
 import { useThemeContext } from '../../contexts/ThemeContext';
-import { MODEL_CONFIG } from '../../services/inference/config';
 
 interface QuantizationSelectorProps {
     value: string;
     onChange: (value: string) => void;
 }
 
+// Quantization has been removed from the codebase.
+// This component is kept for backwards compatibility but only shows FP32 option.
 const options = [
-    { value: MODEL_CONFIG.QUANTIZATION.FP32, label: 'FP32 (Default)' },
-    { value: MODEL_CONFIG.QUANTIZATION.FP16, label: 'FP16 (Disabled - Bad Performance)', isDisabled: true },
-    { value: MODEL_CONFIG.QUANTIZATION.Q8, label: 'INT8 (Disabled - Bad Performance)', isDisabled: true },
+    { value: 'fp32', label: 'FP32 (Default)' },
 ];
 
 export function QuantizationSelector({ value, onChange }: QuantizationSelectorProps) {

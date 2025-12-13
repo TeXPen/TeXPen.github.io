@@ -9,7 +9,6 @@ import { HistoryItem } from '../types';
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const { theme } = useThemeContext();
-    const [quantization, setQuantization] = useState<string>(MODEL_CONFIG.DEFAULT_QUANTIZATION);
     const [provider, setProvider] = useState<Provider>(MODEL_CONFIG.DEFAULT_PROVIDER as Provider);
     const [customModelId, setCustomModelId] = useState<string>(MODEL_CONFIG.ID);
     const [activeTab, setActiveTab] = useState<'draw' | 'upload'>('draw');
@@ -46,7 +45,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isLoadedFromCache,
         isInitialized,
         isGenerationQueued,
-    } = useInkModel(theme, quantization, provider, customModelId);
+    } = useInkModel(theme, provider, customModelId);
 
     // Use the extracted tab state hook
     const {
@@ -216,8 +215,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setTopK,
         topP,
         setTopP,
-        quantization,
-        setQuantization,
         provider,
         setProvider,
         progress,

@@ -4,7 +4,7 @@ import { inferenceService } from '../services/inference/InferenceService';
 
 import { MODEL_CONFIG, GENERATION_CONFIG } from '../services/inference/config';
 
-export function useInkModel(theme: 'light' | 'dark', quantization: string = MODEL_CONFIG.DEFAULT_QUANTIZATION, provider: 'webgpu' | 'wasm', customModelId: string = MODEL_CONFIG.ID) {
+export function useInkModel(theme: 'light' | 'dark', provider: 'webgpu' | 'wasm', customModelId: string = MODEL_CONFIG.ID) {
   // Sampling Defaults
   const [numCandidates, setNumCandidates] = useState<number>(GENERATION_CONFIG.NUM_BEAMS);
   const [doSample, setDoSample] = useState(true); // Default to true for better UX with multiple candidates? Or stick to config? Sticking to hardcoded true for now as per original code logic or Config?
@@ -70,7 +70,7 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = MODE
         const { getSessionOptions } = await import('../services/inference/config');
 
         // Determine which files we expect based on current settings
-        const sessionOptions = getSessionOptions(provider, quantization);
+        const sessionOptions = getSessionOptions(provider);
         const expectedFiles = [
           sessionOptions.encoder_model_file_name,
           sessionOptions.decoder_model_file_name
@@ -104,9 +104,9 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = MODE
       }
     }
     checkCache();
-  }, [config.encoderModelUrl, quantization, provider]);
+  }, [config.encoderModelUrl, provider]);
 
-  const prevSettingsRef = useRef<{ quantization: string; provider: string; modelId: string } | null>(null);
+  const prevSettingsRef = useRef<{ provider: string; modelId: string } | null>(null);
 
   useEffect(() => {
     let isCancelled = false;
@@ -140,12 +140,12 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = MODE
           if (progress !== undefined) {
             setProgress(progress);
           }
-        }, { dtype: quantization, device: provider, modelId: customModelId });
+        }, { device: provider, modelId: customModelId });
 
         if (!isCancelled) {
           setStatus('idle');
           setLoadingPhase('');
-          prevSettingsRef.current = { quantization, provider, modelId: customModelId };
+          prevSettingsRef.current = { provider, modelId: customModelId };
         }
       } catch (error) {
         if (isCancelled) return;
@@ -170,8 +170,7 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = MODE
     return () => {
       isCancelled = true;
       const settingsChanged = prevSettingsRef.current &&
-        (prevSettingsRef.current.quantization !== quantization ||
-          prevSettingsRef.current.provider !== provider ||
+        (prevSettingsRef.current.provider !== provider ||
           prevSettingsRef.current.modelId !== customModelId);
 
       if (settingsChanged && userConfirmed) {
@@ -181,7 +180,7 @@ export function useInkModel(theme: 'light' | 'dark', quantization: string = MODE
         });
       }
     };
-  }, [quantization, provider, customModelId, userConfirmed, isLoadedFromCache]);
+  }, [provider, customModelId, userConfirmed, isLoadedFromCache]);
 
 
 

@@ -53,7 +53,7 @@ describe('useInkModel', () => {
     });
 
     it('initializes in idle state', async () => {
-        const { result } = renderHook(() => useInkModel('light', MODEL_CONFIG.QUANTIZATION.Q8, MODEL_CONFIG.PROVIDERS.WASM));
+        const { result } = renderHook(() => useInkModel('light', MODEL_CONFIG.PROVIDERS.WASM));
         expect(result.current.status).toBe('idle');
         expect(result.current.isInitialized).toBe(false); // Initially false until cache check
 
@@ -72,7 +72,7 @@ describe('useInkModel', () => {
             });
         });
 
-        const { result } = renderHook(() => useInkModel('light', MODEL_CONFIG.QUANTIZATION.Q8, MODEL_CONFIG.PROVIDERS.WASM));
+        const { result } = renderHook(() => useInkModel('light', MODEL_CONFIG.PROVIDERS.WASM));
 
         await waitFor(() => expect(result.current.isInitialized).toBe(true));
 
@@ -123,7 +123,7 @@ describe('useInkModel', () => {
         // Ensure cache is empty
         mockCache.keys.mockResolvedValue([]);
 
-        const { result } = renderHook(() => useInkModel('light', MODEL_CONFIG.QUANTIZATION.Q8, MODEL_CONFIG.PROVIDERS.WASM));
+        const { result } = renderHook(() => useInkModel('light', MODEL_CONFIG.PROVIDERS.WASM));
 
         await waitFor(() => expect(result.current.isInitialized).toBe(true));
 
@@ -155,7 +155,7 @@ describe('useInkModel', () => {
             await new Promise(resolve => setTimeout(resolve, 50));
         });
 
-        const { result } = renderHook(() => useInkModel('light', MODEL_CONFIG.QUANTIZATION.FP32, MODEL_CONFIG.PROVIDERS.WASM));
+        const { result } = renderHook(() => useInkModel('light', MODEL_CONFIG.PROVIDERS.WASM));
 
         await waitFor(() => {
             expect(result.current.isLoadedFromCache).toBe(true);

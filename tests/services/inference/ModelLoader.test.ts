@@ -42,7 +42,6 @@ describe('ModelLoader Progress Reporting', () => {
       encoder_model_file_name: 'encoder.onnx',
       decoder_model_file_name: 'decoder.onnx',
       device: 'wasm',
-      dtype: 'fp32'
     }, onProgress);
 
     // Initial check

@@ -14,7 +14,6 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ isDismissed, onDismiss 
         setUserConfirmed,
         isLoadedFromCache,
         openSettings,
-        quantization,
     } = useAppContext();
 
     const { verifyDownloads } = useVerifyDownloads();
@@ -29,15 +28,8 @@ const LoadingOverlay: React.FC<LoadingOverlayProps> = ({ isDismissed, onDismiss 
 
     const onConfirm = () => setUserConfirmed(true);
 
-    const getEstimatedSize = (q: string) => {
-        switch (q) {
-            case 'fp16': return '~730MB';
-            case 'q8': return '~300MB';
-            case 'int8': return '~300MB';
-            default: return '~1.2GB'; // fp32
-        }
-    };
-    const downloadSize = getEstimatedSize(quantization || 'fp32');
+    // Since quantization was removed, we only use FP32 models
+    const downloadSize = '~1.2GB';
 
     // Only show full overlay for initial permission/confirmation or errors.
     // We NO LONGER show it for standard model loading (handled by Main.tsx toast).

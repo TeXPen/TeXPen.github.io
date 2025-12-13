@@ -29,10 +29,10 @@ export const useHistory = () => {
       if (prev.length > 0 && prev[0].sessionId === item.sessionId) {
         const existingItem = prev[0];
 
-        // We allow duplicate versions now to capture refinements (canvas changes) even if the model output is the same
-        // if (existingItem.latex === item.latex) {
-        //   return prev;
-        // }
+        // Prevent duplicate versions if the output hasn't changed
+        if (existingItem.latex === item.latex) {
+          return prev;
+        }
 
         const previousVersions = existingItem.versions || [];
         // Add the *current* state of the item (before this update) to versions? 

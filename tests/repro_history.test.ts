@@ -9,10 +9,10 @@ const addToHistoryReducer = (prev: HistoryItem[], item: HistoryItem): HistoryIte
   if (prev.length > 0 && prev[0].sessionId === item.sessionId) {
     const existingItem = prev[0];
 
-    // LOGIC CHANGED: We now allow duplicate versions
-    // if (existingItem.latex === item.latex) {
-    //   return prev;
-    // }
+    // Prevent duplicate versions if the output hasn't changed
+    if (existingItem.latex === item.latex) {
+      return prev;
+    }
 
     const previousVersions = existingItem.versions || [];
     const newVersions = [...previousVersions];
@@ -97,7 +97,7 @@ describe('History Logic', () => {
     expect(history[0].versions?.[1].strokes).toEqual(stroke2);
   });
 
-  it('should NOT drop update if latex is same (allow refinements)', () => {
+  it('should drop update if latex is same', () => {
     const sessionId = 'session-1';
     const stroke1 = [{ points: [], tool: 'pen', color: 'black', width: 1 } as Stroke];
     const item1: HistoryItem = { id: '1', sessionId, latex: 'A', timestamp: 1, source: 'draw', strokes: stroke1 };
@@ -108,9 +108,6 @@ describe('History Logic', () => {
     const item2: HistoryItem = { id: '2', sessionId, latex: 'A', timestamp: 2, source: 'draw', strokes: stroke2 };
 
     const history2 = addToHistoryReducer(history, item2);
-    // Expect new version to be added
-    expect(history2).not.toBe(history);
-    expect(history2[0].versions?.length).toBe(2);
-    expect(history2[0].versions?.[1].strokes).toEqual(stroke2);
+    expect(history2).toBe(history); // check reference equality (returned prev)
   });
 });

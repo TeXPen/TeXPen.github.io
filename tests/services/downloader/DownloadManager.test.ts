@@ -1,25 +1,22 @@
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { downloadManager } from '../../../services/downloader/DownloadManager';
-// Mock ChunkStore and ParallelDownloader if possible, or test integration?
-// Integration with mocked fetch is better.
+import { createSHA256 } from 'hash-wasm';
 
-// Check if we can mock fetch
+// Mock hash-wasm at the top level
+vi.mock('hash-wasm', () => ({
+  createSHA256: vi.fn()
+}));
+
+// Mock ChunkStore if needed, but integration with logic is fine.
+
+// Mock fetch globally
 const fetchMock = vi.fn();
 global.fetch = fetchMock;
-
-// Mock IDB or use a fake implementation
-// Since IDB is async and persistent, let's mock ChunkStore for DownloadManager test
-// OR just verify DownloadManager calls ParallelDownloader.
-
-// But we want to test "Parallel downloads" logic roughly.
 
 describe('DownloadManager V3', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    // Reset singleton state if possible? 
-    // DownloadManager is singleton. We can't easily reset it without exposing a method.
-    // However, for verify we mostly care that it orchestrates.
   });
 
   it('is defined', () => {
@@ -40,14 +37,21 @@ describe('DownloadManager V3', () => {
       blob: () => Promise.resolve(new Blob(['test']))
     });
 
-    // We can't easily await the download unless we hook into it or mock ChunkStore to be fast.
-    // For now, this just proves import and basic existence.
-    // Real validation is best done via manual check as requested by user ("It works on computer and mobile").
-
     expect(true).toBe(true);
   });
 
   it('validates checksums correctly', async () => {
+    // Setup hash-wasm mock for this test
+    const mockHasher = {
+      init: vi.fn(),
+      update: vi.fn(),
+      digest: vi.fn()
+    };
+    (createSHA256 as any).mockResolvedValue(mockHasher);
+
+    // Case 1: Match
+    mockHasher.digest.mockReturnValue('01');
+
     // Mock Cache API
     const mockCache = {
       match: vi.fn(),
@@ -57,25 +61,10 @@ describe('DownloadManager V3', () => {
     };
     (global as any).caches = mockCaches;
 
-    // Mock Crypto API
-    const mockDigest = vi.fn().mockImplementation(async (algo, buffer) => {
-      // Simple mock: return a buffer of 1s
-      return new Uint8Array([1]).buffer;
-    });
-
-    Object.defineProperty(global, 'crypto', {
-      value: {
-        subtle: {
-          digest: mockDigest
-        }
-      },
-      writable: true
-    });
-
-    // Expected hash of [1] is '01'
+    // Expected hash
     const expectedHash = '01';
 
-    // Mock cached response
+    // Mock cached response with stream support
     mockCache.match.mockResolvedValue({
       headers: {
         get: () => '1'
@@ -83,7 +72,14 @@ describe('DownloadManager V3', () => {
       clone: () => ({
         blob: () => Promise.resolve({
           size: 1,
-          arrayBuffer: () => Promise.resolve(new Uint8Array([1]).buffer)
+          arrayBuffer: () => Promise.resolve(new Uint8Array([1]).buffer),
+          stream: () => ({
+            getReader: () => ({
+              read: vi.fn()
+                .mockResolvedValueOnce({ done: false, value: new Uint8Array([1]) })
+                .mockResolvedValueOnce({ done: true })
+            })
+          })
         })
       })
     });
@@ -91,9 +87,16 @@ describe('DownloadManager V3', () => {
     // Test Match
     const resultMatch = await downloadManager.checkCacheIntegrity('http://example.com', expectedHash);
     expect(resultMatch.ok).toBe(true);
+    expect(mockHasher.update).toHaveBeenCalled();
 
-    // Test Mismatch
-    const resultMismatch = await downloadManager.checkCacheIntegrity('http://example.com', 'FF');
+    // Case 2: Mismatch
+    // Since checkCacheIntegrity calls createSHA256 again, and we mocked it to return mockHasher,
+    // we can change the behavior of mockHasher or the return of createSHA256.
+    // Changing mockHasher behavior is easiest as it is the same object reference returned.
+
+    mockHasher.digest.mockReturnValue('FF');
+
+    const resultMismatch = await downloadManager.checkCacheIntegrity('http://example.com', expectedHash);
     expect(resultMismatch.ok).toBe(false);
     expect(resultMismatch.reason).toContain('Checksum mismatch');
   });

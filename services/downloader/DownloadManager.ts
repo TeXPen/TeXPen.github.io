@@ -3,6 +3,7 @@ import { ParallelDownloader, ParallelDownloadProgress } from './ParallelDownload
 import { ChunkStore } from './ChunkStore';
 import { env } from '@huggingface/transformers';
 import { DownloadProgress } from './types';
+import { createSHA256 } from 'hash-wasm';
 
 export class DownloadManager {
   private static instance: DownloadManager;
@@ -165,13 +166,37 @@ export class DownloadManager {
       }
 
       if (expectedChecksum) {
-        const buffer = await blob.arrayBuffer();
-        const hashBuffer = await crypto.subtle.digest('SHA-256', buffer);
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
-        const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        try {
+          const hasher = await createSHA256();
+          hasher.init();
 
-        if (hashHex !== expectedChecksum) {
-          return { ok: false, reason: `Checksum mismatch: expected ${expectedChecksum}, got ${hashHex}` };
+          // Use streaming to avoid loading entire file into memory
+          if (blob.stream) {
+            const reader = blob.stream().getReader();
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) break;
+              if (value) {
+                hasher.update(value);
+              }
+            }
+          } else {
+            // Fallback for environments without blob.stream() (unlikely in modern browsers/Bun)
+            // Process in chunks manually if needed, but blob.stream() is standard
+            const buffer = await blob.arrayBuffer();
+            hasher.update(new Uint8Array(buffer));
+          }
+
+          const hashHex = hasher.digest();
+
+          if (hashHex !== expectedChecksum) {
+            return { ok: false, reason: `Checksum mismatch: expected ${expectedChecksum}, got ${hashHex}` };
+          }
+        } catch (error) {
+          console.error('Checksum verification failed:', error);
+          // Fallback to manual load if stream fails? Or just fail.
+          // Let's fail for now to detect issues.
+          return { ok: false, reason: `Checksum calculation failed: ${error}` };
         }
       }
     }

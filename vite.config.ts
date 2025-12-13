@@ -40,6 +40,9 @@ export default defineConfig(({ mode }) => {
       environment: 'jsdom',
       setupFiles: './tests/setup.ts',
       css: true,
+    },
+    worker: {
+      format: 'es'
     }
   };
 });

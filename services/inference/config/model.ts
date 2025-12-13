@@ -1,6 +1,6 @@
 export const MODEL_CONFIG = {
   ID: 'Ji-Ha/TexTeller3-ONNX-dynamic',
-  DEFAULT_PROVIDER: 'webgpu',
+  DEFAULT_PROVIDER: 'wasm',
 
   // Model Specs
   IMAGE_SIZE: 448,

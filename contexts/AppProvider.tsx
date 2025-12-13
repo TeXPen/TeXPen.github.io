@@ -17,6 +17,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isWebGPUAvailable().then(available => {
             if (available) {
                 setProvider('webgpu');
+            } else {
+                setProvider('wasm');
             }
         });
     }, []);

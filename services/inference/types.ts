@@ -23,6 +23,21 @@ export interface InferenceResult {
   debugImage: string;
 }
 
+export interface BBox {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  label?: string;
+  confidence?: number;
+  content?: string;
+}
+
+export interface ParagraphInferenceResult {
+  markdown: string;
+  debugImage?: string;
+}
+
 export interface SamplingOptions {
   do_sample?: boolean;
   temperature?: number;

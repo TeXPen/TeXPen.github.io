@@ -1,9 +1,10 @@
-import { InferenceResult } from "../types";
+import { InferenceResult, ParagraphInferenceResult } from "../types";
 
 export type InferenceRequest = {
+  type: 'standard' | 'paragraph';
   blob: Blob;
   options: import("../types").SamplingOptions;
-  resolve: (value: InferenceResult | PromiseLike<InferenceResult>) => void;
+  resolve: (value: InferenceResult | ParagraphInferenceResult | PromiseLike<InferenceResult | ParagraphInferenceResult>) => void;
   reject: (reason?: unknown) => void;
 };
 
@@ -25,7 +26,7 @@ export class InferenceQueue {
 
   constructor(private processor: InferenceProcessor) { }
 
-  public infer(imageBlob: Blob, options: import("../types").SamplingOptions): Promise<InferenceResult> {
+  public infer(imageBlob: Blob, options: import("../types").SamplingOptions, type: 'standard' | 'paragraph' = 'standard'): Promise<InferenceResult | ParagraphInferenceResult> {
     return new Promise((resolve, reject) => {
       // 1. If there is ALREADY a pending request waiting to start, it is now obsolete.
       //    Reject it (Skipped) and replace it with this new one.
@@ -35,6 +36,7 @@ export class InferenceQueue {
 
       // 2. Set this properly as the next pending request.
       this.pendingRequest = {
+        type,
         blob: imageBlob,
         options,
         resolve,

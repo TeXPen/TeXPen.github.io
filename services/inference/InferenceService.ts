@@ -3,6 +3,7 @@ import { MODEL_CONFIG } from "./config";
 import {
   InferenceOptions,
   InferenceResult,
+  ParagraphInferenceResult,
   SamplingOptions,
 } from "./types";
 
@@ -99,7 +100,14 @@ export class InferenceService {
     if (!options.num_beams && !options.do_sample) {
       options.num_beams = 1;
     }
-    return this.queue.infer(imageBlob, options);
+    return this.queue.infer(imageBlob, options, 'standard') as Promise<InferenceResult>;
+  }
+
+  public async inferParagraph(
+    imageBlob: Blob,
+    options: SamplingOptions
+  ): Promise<ParagraphInferenceResult> {
+    return this.queue.infer(imageBlob, options, 'paragraph') as Promise<ParagraphInferenceResult>;
   }
 
   private async runInference(
@@ -141,7 +149,8 @@ export class InferenceService {
         resolve: (data) => {
           cleanup();
           // Success: Resolve the queue's request
-          req.resolve(data as InferenceResult);
+          // TypeScript might complain about resolve type mismatch if we don't cast or unify
+          req.resolve(data as any);
           resolve();
         },
         reject: (err) => {
@@ -160,8 +169,10 @@ export class InferenceService {
         debug: !!onPreprocess
       };
 
+      const msgType = req.type === 'paragraph' ? 'inferParagraph' : 'infer';
+
       this.worker!.postMessage({
-        type: 'infer',
+        type: msgType,
         id,
         data: workerData
       });

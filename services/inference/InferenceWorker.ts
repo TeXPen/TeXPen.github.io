@@ -1,7 +1,9 @@
 import { InferenceEngine } from "./InferenceEngine";
+import { ParagraphInferenceEngine } from "./ParagraphInferenceEngine";
 import { InferenceOptions, SamplingOptions } from "./types";
 
 const engine = new InferenceEngine();
+const paragraphEngine = new ParagraphInferenceEngine(engine);
 
 self.onmessage = async (e: MessageEvent) => {
   const { type, id, data } = e.data;
@@ -12,6 +14,10 @@ self.onmessage = async (e: MessageEvent) => {
         await engine.init((status, progress) => {
           self.postMessage({ type: "progress", id, data: { status, progress } });
         }, data as InferenceOptions);
+        // Also init paragraph engine if needed (loading extra models)
+        await paragraphEngine.init((status, progress) => {
+          self.postMessage({ type: "progress", id, data: { status, progress } });
+        });
         self.postMessage({ type: "success", id, data: null });
         break;
 
@@ -32,6 +38,21 @@ self.onmessage = async (e: MessageEvent) => {
         // Pass a signal if we supported aborting from main (future TODO)
         // For now, simple inference.
         const result = await engine.infer(blob, optionsWithCallback);
+        self.postMessage({ type: "success", id, data: result });
+        break;
+      }
+
+      case "inferParagraph": {
+        const { blob, options, debug } = data as { blob: Blob; options: SamplingOptions; debug?: boolean };
+
+        const optionsWithCallback = { ...options };
+        if (debug) {
+          // TODO: Paragraph engine debug images?
+          // For now just allow simple pass through if supported
+          // optionsWithCallback.onPreprocess = ...
+        }
+
+        const result = await paragraphEngine.inferParagraph(blob, optionsWithCallback);
         self.postMessage({ type: "success", id, data: result });
         break;
       }

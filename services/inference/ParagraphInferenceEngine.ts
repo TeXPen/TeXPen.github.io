@@ -10,7 +10,7 @@ import { InferenceEngine } from "./InferenceEngine";
 import { bboxMerge, splitConflict, sortBoxes } from "./utils/boxUtils";
 import { maskImg, sliceFromImage } from "./utils/imageUtils";
 import { removeStyle, addNewlines } from "../../utils/latex";
-import { InferenceSession } from "onnxruntime-web";
+import { InferenceSession, env } from "onnxruntime-web";
 import { preprocessYolo } from "./utils/yoloPreprocess";
 import { yoloPostprocess } from "./utils/yoloPostprocess";
 import { downloadManager } from "../downloader/DownloadManager";
@@ -20,8 +20,9 @@ import { dbnetPostprocess } from "./utils/dbnetPostprocess";
 
 import { modelLoader } from "./ModelLoader";
 import { preprocessTrOCR } from "./utils/trocrPreprocess";
-import { AutoTokenizer, PreTrainedTokenizer, VisionEncoderDecoderModel, Tensor } from "@huggingface/transformers";
 import { getSessionOptions } from "./config";
+import { recPreprocess } from "./utils/recPreprocess";
+import { recPostprocess } from "./utils/recPostprocess";
 
 // Custom filenames for Text Recognition models in the same repo
 // const TEXT_ENC_NAME = "onnx/text_recognizer_encoder.onnx";
@@ -36,8 +37,7 @@ export class ParagraphInferenceEngine {
   private latexRecEngine: InferenceEngine;
   private latexDetSession: InferenceSession | null = null;
   private textDetSession: InferenceSession | null = null;
-  private textRecModel: VisionEncoderDecoderModel | null = null;
-  private textRecTokenizer: PreTrainedTokenizer | null = null;
+  private textRecSession: InferenceSession | null = null;
 
   // We need models for:
   // 1. Latex Detection (YOLO/ONNX)
@@ -56,9 +56,23 @@ export class ParagraphInferenceEngine {
 
     if (onProgress) onProgress("Initializing Paragraph Models...", 0);
 
+    // Configure WASM paths to root (where vite-plugin-static-copy puts them)
+    env.wasm.wasmPaths = "/";
+    // Disable multi-threading to avoid "recursive Transpose" and "ceil()" errors in WASM backend
+    env.wasm.numThreads = 1;
+
+    // Standard Session Options for Stability
+    const sessionOptions: InferenceSession.SessionOptions = {
+      executionProviders: ['wasm'], // Force WASM for consistency if WebGPU is flaky, or try ['webgpu', 'wasm']
+      executionMode: 'sequential',
+      intraOpNumThreads: 1,
+      interOpNumThreads: 1,
+      graphOptimizationLevel: 'all'
+    };
+
     // Load Latex Detection Model (YOLO)
     try {
-      const modelId = MODEL_CONFIG.ID;
+      const modelId = MODEL_CONFIG.LATEX_DET_ID;
       const fileUrl = `https://huggingface.co/${modelId}/resolve/main/${MODEL_CONFIG.LATEX_DET_MODEL}`;
 
       if (onProgress) onProgress("Downloading Detection Model...", 10);
@@ -89,10 +103,20 @@ export class ParagraphInferenceEngine {
       // For now, let's try 'webgpu' then 'wasm' fallback?
       // Or just 'wasm' for detection if it's lighter? YOLOv8s is ~20MB. WebGPU is better.
       try {
-        this.latexDetSession = await InferenceSession.create(modelBuffer, { executionProviders: ['webgpu', 'wasm'] });
+        // Try WebGPU first? The error log showed WebGPU failed detection earlier, so maybe just force WASM with safe options.
+        // If we want to support WebGPU, we need to pass options there too.
+        // For debugging, let's stick to the user's current fallback path which is WASM.
+        // Actually, let's try ['webgpu', 'wasm'] but with the options.
+        this.latexDetSession = await InferenceSession.create(new Uint8Array(modelBuffer), {
+          ...sessionOptions,
+          executionProviders: ['webgpu', 'wasm']
+        });
       } catch (e) {
         console.warn("WebGPU failed for detection, falling back to wasm", e);
-        this.latexDetSession = await InferenceSession.create(modelBuffer, { executionProviders: ['wasm'] });
+        this.latexDetSession = await InferenceSession.create(new Uint8Array(modelBuffer), {
+          ...sessionOptions,
+          executionProviders: ['wasm']
+        });
       }
 
       if (onProgress) onProgress("Ready", 100);
@@ -120,10 +144,16 @@ export class ParagraphInferenceEngine {
           const txtBuffer = await txtBlob.arrayBuffer();
 
           try {
-            this.textDetSession = await InferenceSession.create(txtBuffer, { executionProviders: ['webgpu', 'wasm'] });
+            this.textDetSession = await InferenceSession.create(new Uint8Array(txtBuffer), {
+              ...sessionOptions,
+              executionProviders: ['webgpu', 'wasm']
+            });
           } catch (e) {
             console.warn("WebGPU failed for text detection, falling back to wasm", e);
-            this.textDetSession = await InferenceSession.create(txtBuffer, { executionProviders: ['wasm'] });
+            this.textDetSession = await InferenceSession.create(new Uint8Array(txtBuffer), {
+              ...sessionOptions,
+              executionProviders: ['wasm']
+            });
           }
         } else {
           console.warn("Text detection model fetch failed or empty");
@@ -133,18 +163,41 @@ export class ParagraphInferenceEngine {
       }
     }
 
-    // Load Text Recognition (TrOCR/Parseq)
-    if (!this.textRecModel) {
+    // Load Text Recognition (CRNN/SVTR)
+    if (!this.textRecSession) {
       try {
-        if (onProgress) onProgress("Loading Text Recognition Model...", 70);
         const recModelId = MODEL_CONFIG.TEXT_RECOGNIZER_ID;
-        this.textRecTokenizer = await AutoTokenizer.from_pretrained(recModelId);
+        // Construct URL for ONNX file
+        // e.g. https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/english/rec.onnx
+        const recFileUrl = `https://huggingface.co/${recModelId}/resolve/main/${MODEL_CONFIG.TEXT_REC_MODEL}`;
 
-        try {
-          this.textRecModel = await import("@huggingface/transformers").then(m => m.AutoModelForVision2Seq.from_pretrained(recModelId, { device: 'webgpu', dtype: 'fp32' } as any));
-        } catch (e) {
-          console.warn("WebGPU Text Rec failed, fallback to WASM", e);
-          this.textRecModel = await import("@huggingface/transformers").then(m => m.AutoModelForVision2Seq.from_pretrained(recModelId, { device: 'wasm' } as any));
+        if (onProgress) onProgress("Downloading Text Recognition Model...", 70);
+
+        await downloadManager.downloadFile(recFileUrl, (p) => {
+          if (onProgress) onProgress(`Downloading Text Recognition Model...`, Math.round((p.loaded / p.total) * 100));
+        });
+
+        const recCache = await caches.open('transformers-cache');
+        const recResponse = await recCache.match(recFileUrl);
+
+        if (recResponse) {
+          const recBlob = await recResponse.blob();
+          const recBuffer = await recBlob.arrayBuffer();
+
+          try {
+            this.textRecSession = await InferenceSession.create(new Uint8Array(recBuffer), {
+              ...sessionOptions,
+              executionProviders: ['webgpu', 'wasm']
+            });
+          } catch (e) {
+            console.warn("WebGPU Text Rec failed, fallback to WASM", e);
+            this.textRecSession = await InferenceSession.create(new Uint8Array(recBuffer), {
+              ...sessionOptions,
+              executionProviders: ['wasm']
+            });
+          }
+        } else {
+          console.warn("Text recognition model fetch failed or empty");
         }
       } catch (e) {
         console.error("Failed to init text recognition model", e);
@@ -282,33 +335,32 @@ export class ParagraphInferenceEngine {
   }
 
   private async recognizeText(images: Blob[]): Promise<string[]> {
-    if (!this.textRecModel || !this.textRecTokenizer) {
+    if (!this.textRecSession) {
       return images.map(() => "Rec Model Not Loaded");
     }
 
     const results: string[] = [];
 
-    // Batching? For now sequential to save memory
     for (const image of images) {
       try {
-        const tensor = await preprocessTrOCR(image);
+        const tensor = await recPreprocess(image);
 
-        // Generate
-        const outputTokenIds = await this.textRecModel.generate({
-          inputs: tensor,
-          max_new_tokens: 20, // Short text lines
-          num_beams: 1,
-          do_sample: false
-        } as any) as Tensor;
+        const feeds: Record<string, import("onnxruntime-web").Tensor> = {};
+        // Usually input name is 'x', 'images', 'input'
+        // We'll check inputNames[0]
+        const inputName = this.textRecSession.inputNames[0];
+        feeds[inputName] = tensor;
 
-        const decoded = this.textRecTokenizer.batch_decode(outputTokenIds, {
-          skip_special_tokens: true
-        });
+        const sessRes = await this.textRecSession.run(feeds);
+        const outputName = this.textRecSession.outputNames[0];
+        const output = sessRes[outputName];
 
-        results.push(decoded[0].trim());
+        // Postprocess
+        const text = recPostprocess(output.data as Float32Array, output.dims as number[]);
+        results.push(text);
 
-        tensor.dispose();
-        // outputTokenIds?.dispose(); // If tensor
+        // cleanup
+        // tensor.dispose(); // if dispose available or needed? ORT-web tensor isn't disposable in same way as TFJS
       } catch (e) {
         console.error("Text Rec Error", e);
         results.push("[Error]");

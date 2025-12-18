@@ -50,9 +50,9 @@ function computeIOU(a: BBox, b: BBox): number {
 }
 
 /**
- * Post-processes YOLO output.
- * Assumes output shape [1, 5, 8400] or similar (batch, [xc, yc, w, h, conf], anchors)
- * Adjust logic based on specific model export (sometimes permuted).
+ * Post-processes YOLO output for multi-class detection.
+ * Pix2Text MFD has 2 classes: isolated (index 0), embedding (index 1)
+ * Assumes output shape [1, 4+C, N] where C = number of classes
  */
 export function yoloPostprocess(
   output: Float32Array,
@@ -63,12 +63,17 @@ export function yoloPostprocess(
   inputWidth: number, // Model input size
   inputHeight: number
 ): BBox[] {
-  // Check dims. Usually [1, 5, N] or [1, N, 5]
-  // Common YOLOv8 export: [1, 5, 8400] -> 5 channels: cx, cy, w, h, score (class 0)
+  // Check dims. Usually [1, 4+C, N] where C is num classes
+  // For Pix2Text MFD: [1, 6, N] = 4 bbox coords + 2 classes
+  // For single class: [1, 5, N] = 4 bbox coords + 1 conf
 
-  // Flattened array access
-  const numChannels = dims[1]; // e.g. 5 (4 bbox + 1 conf) or more if multi-class
+  const numChannels = dims[1]; // e.g. 6 (4 bbox + 2 classes) or 5 (4 bbox + 1 conf)
   const numAnchors = dims[2]; // e.g. 8400
+
+  const numClasses = numChannels - 4; // Number of class scores
+  const classNames = numClasses === 2
+    ? ['isolated', 'embedding']
+    : ['latex']; // Fallback for single-class models
 
   const boxes: BBox[] = [];
 
@@ -78,16 +83,19 @@ export function yoloPostprocess(
 
   // Loop through anchors
   for (let i = 0; i < numAnchors; i++) {
-    // Access column i
-    // Data layout: [ [cx...], [cy...], [w...], [h...], [conf...] ]
-    // Index = channel * numAnchors + i
+    // Find best class and its score
+    let bestClassIdx = 0;
+    let bestScore = 0;
 
-    // Assuming structure [1, C, N]
-    const off = 0; // Batch 0 offset
+    for (let c = 0; c < numClasses; c++) {
+      const score = output[(4 + c) * numAnchors + i];
+      if (score > bestScore) {
+        bestScore = score;
+        bestClassIdx = c;
+      }
+    }
 
-    const score = output[4 * numAnchors + i]; // 5th row (index 4)
-
-    if (score > confThreshold) {
+    if (bestScore > confThreshold) {
       const cx = output[0 * numAnchors + i];
       const cy = output[1 * numAnchors + i];
       const w = output[2 * numAnchors + i];
@@ -104,8 +112,8 @@ export function yoloPostprocess(
         y,
         w: width,
         h: height,
-        confidence: score,
-        label: 'latex' // Todo: handle multi-class if needed
+        confidence: bestScore,
+        label: classNames[bestClassIdx]
       });
     }
   }

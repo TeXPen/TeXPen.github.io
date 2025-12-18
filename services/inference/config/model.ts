@@ -3,14 +3,14 @@ export const MODEL_CONFIG = {
   DEFAULT_PROVIDER: 'wasm',
 
   // Models
-  TEXT_DETECTOR_ID: 'Ji-Ha/TexTeller3-ONNX-dynamic',
-  TEXT_RECOGNIZER_ID: 'Ji-Ha/TexTeller3-ONNX-dynamic',
+  LATEX_DET_ID: 'breezedeus/pix2text-mfd',  // Math Formula Detection (YOLOv7-based)
+  TEXT_DETECTOR_ID: 'monkt/paddleocr-onnx',
+  TEXT_RECOGNIZER_ID: 'monkt/paddleocr-onnx',
 
   // Filenames
-  LATEX_DET_MODEL: 'onnx/detection.onnx',
-  TEXT_DET_MODEL: 'onnx/text_detector.onnx',
-  TEXT_REC_MODEL_ENCODER: 'onnx/text_recognizer_encoder.onnx',
-  TEXT_REC_MODEL_DECODER: 'onnx/text_recognizer_decoder_with_past.onnx',
+  LATEX_DET_MODEL: 'mfd-v20240618.onnx',  // Pix2Text MFD model (44.6 MB)
+  TEXT_DET_MODEL: 'detection/v5/det.onnx',
+  TEXT_REC_MODEL: 'languages/english/rec.onnx',
 
   IMAGE_SIZE: 448,
   MEAN: [0.9545467],

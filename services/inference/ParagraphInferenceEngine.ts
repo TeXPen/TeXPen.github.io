@@ -21,8 +21,8 @@ import { dbnetPostprocess } from "./utils/dbnetPostprocess";
 import { modelLoader } from "./ModelLoader";
 import { preprocessTrOCR } from "./utils/trocrPreprocess";
 import { getSessionOptions } from "./config";
-import { recPreprocess } from "./utils/recPreprocess";
-import { recPostprocess } from "./utils/recPostprocess";
+import { recBatchPreprocess } from "./utils/recPreprocess";
+import { recBatchPostprocess } from "./utils/recPostprocess";
 
 // Custom filenames for Text Recognition models in the same repo
 // const TEXT_ENC_NAME = "onnx/text_recognizer_encoder.onnx";
@@ -58,17 +58,17 @@ export class ParagraphInferenceEngine {
 
     // Configure WASM paths to root (where vite-plugin-static-copy puts them)
     env.wasm.wasmPaths = "/";
-    // Disable multi-threading to avoid "recursive Transpose" and "ceil()" errors in WASM backend
-    env.wasm.numThreads = 1;
-    // Disable SIMD to prevent "using ceil() in shape computation is not yet supported for MaxPool"
-    env.wasm.simd = false;
+    // Enable multi-threading for performance
+    env.wasm.numThreads = 4;
+    // Enable SIMD if possible for performance
+    env.wasm.simd = true;
 
-    // Standard Session Options for Stability
+    // Standard Session Options for Stability & Performance
     const sessionOptions: InferenceSession.SessionOptions = {
-      executionProviders: ['wasm'], // Force WASM for consistency if WebGPU is flaky, or try ['webgpu', 'wasm']
+      executionProviders: ['wasm'], // Use WASM, it's generally more stable for these models
       executionMode: 'sequential',
-      intraOpNumThreads: 1,
-      interOpNumThreads: 1,
+      intraOpNumThreads: 4,
+      interOpNumThreads: 4,
       graphOptimizationLevel: 'all'
     };
 
@@ -244,10 +244,11 @@ export class ParagraphInferenceEngine {
     textBBoxes.forEach((b, i) => b.content = textContents[i]);
 
     // 7. Recognize Latex
-    // Run Latex Rec Model (Formula Rec) on each slice in parallel
-    const latexResults = await Promise.all(
-      latexSlices.map(slice => this.latexRecEngine.infer(slice, options, signal))
-    );
+    // Run Latex Rec Model (Formula Rec) on each slice SEQUENTIALLY to avoid session concurrency issues
+    const latexResults: InferenceResult[] = [];
+    for (const slice of latexSlices) {
+      latexResults.push(await this.latexRecEngine.infer(slice, options, signal));
+    }
     latexResults.forEach((res, i) => {
       latexBBoxes[i].content = res.latex;
     });
@@ -335,31 +336,28 @@ export class ParagraphInferenceEngine {
   }
 
   private async recognizeText(images: Blob[]): Promise<string[]> {
+    if (images.length === 0) return [];
     if (!this.textRecSession) {
       return images.map(() => "Rec Model Not Loaded");
     }
 
-    const results: string[] = [];
-    for (let i = 0; i < images.length; i++) {
-      const image = images[i];
-      try {
-        const tensor = await recPreprocess(image);
+    try {
+      // BATCHED Inference for major speed boost and stability
+      const tensor = await recBatchPreprocess(images);
 
-        const feeds: Record<string, import("onnxruntime-web").Tensor> = {};
-        const inputName = this.textRecSession!.inputNames[0];
-        feeds[inputName] = tensor;
+      const feeds: Record<string, import("onnxruntime-web").Tensor> = {};
+      const inputName = this.textRecSession!.inputNames[0];
+      feeds[inputName] = tensor;
 
-        const sessRes = await this.textRecSession!.run(feeds);
-        const outputName = this.textRecSession!.outputNames[0];
-        const output = sessRes[outputName];
+      const sessRes = await this.textRecSession!.run(feeds);
+      const outputName = this.textRecSession!.outputNames[0];
+      const output = sessRes[outputName];
 
-        results.push(recPostprocess(output.data as Float32Array, output.dims as number[]));
-      } catch (e) {
-        console.error(`Text Rec Error at index ${i}:`, e);
-        results.push("[Error]");
-      }
+      return recBatchPostprocess(output.data as Float32Array, output.dims as number[]);
+    } catch (e) {
+      console.error(`Batched Text Rec Error:`, e);
+      return images.map(() => "[Error]");
     }
-    return results;
   }
 
   private combineResults(textBBoxes: BBox[], latexBBoxes: BBox[]): string {

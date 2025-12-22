@@ -57,7 +57,8 @@ export async function sliceFromImage(imageBlob: Blob, bboxes: BBox[]): Promise<B
 
   for (const bbox of bboxes) {
     // Ensure bounds and add padding
-    const padding = 5;
+    // Increased padding to 12 to prevent cutting off edge characters (e.g. "test" -> "st")
+    const padding = 12;
     const x = Math.max(0, bbox.x - padding);
     const y = Math.max(0, bbox.y - padding);
     const w = Math.min(bitmap.width - x, bbox.w + padding * 2);
@@ -74,6 +75,36 @@ export async function sliceFromImage(imageBlob: Blob, bboxes: BBox[]): Promise<B
 
     // Get Region
     const region = ctx.getImageData(x, y, w, h);
+
+    // Check for dark background (white text on black)
+    // Heuristic: Check mean brightness
+    let totalBrightness = 0;
+    const data = region.data;
+    const len = data.length;
+
+    // Sample every 4th pixel for speed
+    let samples = 0;
+    for (let i = 0; i < len; i += 16) { // 4 channels * 4 pixels stride
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      // Brightness = 0.299R + 0.587G + 0.114B
+      totalBrightness += (0.299 * r + 0.587 * g + 0.114 * b);
+      samples++;
+    }
+
+    const meanBrightness = samples > 0 ? totalBrightness / samples : 255;
+
+    // If background is dark (mean < 128), invert colors
+    // We assume text is likely lighter than background if mean is low.
+    if (meanBrightness < 100) { // Threshold 100 to be safe
+      for (let i = 0; i < len; i += 4) {
+        data[i] = 255 - data[i];     // R
+        data[i + 1] = 255 - data[i + 1]; // G
+        data[i + 2] = 255 - data[i + 2]; // B
+        // Alpha unchanged
+      }
+    }
 
     // Put on new canvas to blobify
     const sliceCanvas = new OffscreenCanvas(w, h);

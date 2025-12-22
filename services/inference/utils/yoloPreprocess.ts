@@ -10,7 +10,7 @@ import { Tensor } from 'onnxruntime-web';
 export async function preprocessYolo(
   imageBlob: Blob,
   targetSize: number = 640
-): Promise<{ tensor: Tensor; inputWidth: number; inputHeight: number; originalWidth: number; originalHeight: number }> {
+): Promise<{ tensor: Tensor; inputWidth: number; inputHeight: number; originalWidth: number; originalHeight; scale: number; padX: number; padY: number }> {
   // 1. Load image
   const bitmap = await createImageBitmap(imageBlob);
   const { width: w, height: h } = bitmap;
@@ -67,6 +67,9 @@ export async function preprocessYolo(
     inputWidth: targetSize,
     inputHeight: targetSize,
     originalWidth,
-    originalHeight
+    originalHeight,
+    scale,
+    padX: dw,
+    padY: dh
   };
 }

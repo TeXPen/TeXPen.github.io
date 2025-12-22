@@ -58,10 +58,9 @@ export function yoloPostprocess(
   output: Float32Array,
   dims: number[],
   confThreshold: number,
-  originalWidth: number,
-  originalHeight: number,
-  inputWidth: number, // Model input size
-  inputHeight: number
+  scale: number,
+  padX: number,
+  padY: number
 ): BBox[] {
   // Check dims. Usually [1, 4+C, N] where C is num classes
   // For Pix2Text MFD: [1, 6, N] = 4 bbox coords + 2 classes
@@ -76,10 +75,6 @@ export function yoloPostprocess(
     : ['latex']; // Fallback for single-class models
 
   const boxes: BBox[] = [];
-
-  // Scaling factors
-  const scaleX = originalWidth / inputWidth;
-  const scaleY = originalHeight / inputHeight;
 
   // Loop through anchors
   for (let i = 0; i < numAnchors; i++) {
@@ -102,10 +97,16 @@ export function yoloPostprocess(
       const h = output[3 * numAnchors + i];
 
       // Convert center-wh to top-left-wh
-      const x = (cx - w / 2) * scaleX;
-      const y = (cy - h / 2) * scaleY;
-      const width = w * scaleX;
-      const height = h * scaleY;
+      // And unpad/unscale:
+      // x_orig = (x_input - padX) / scale
+
+      const xInput = cx - w / 2;
+      const yInput = cy - h / 2;
+
+      const x = (xInput - padX) / scale;
+      const y = (yInput - padY) / scale;
+      const width = w / scale;
+      const height = h / scale;
 
       boxes.push({
         x,

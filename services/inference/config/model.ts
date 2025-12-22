@@ -3,14 +3,16 @@ export const MODEL_CONFIG = {
   DEFAULT_PROVIDER: 'wasm',
 
   // Models
-  LATEX_DET_ID: 'breezedeus/pix2text-mfd',  // Math Formula Detection (YOLOv7-based)
-  TEXT_DETECTOR_ID: 'monkt/paddleocr-onnx',
-  TEXT_RECOGNIZER_ID: 'monkt/paddleocr-onnx',
+  PADDLE_VL_ID: 'PaddlePaddle/PaddleOCR-VL',
+  PADDLE_VL_ONNX_REPO: 'USER_NAME/REPO_NAME', // Updated by user after upload
+  LATEX_DET_ID: 'breezedeus/pix2text-mfd',
+  // TEXT_DETECTOR_ID: 'monkt/paddleocr-onnx', // Deprecated
+  // TEXT_RECOGNIZER_ID: 'monkt/paddleocr-onnx', // Deprecated
 
   // Filenames
-  LATEX_DET_MODEL: 'mfd-v20240618.onnx',  // Pix2Text MFD model (44.6 MB)
-  TEXT_DET_MODEL: 'detection/v5/det.onnx',
-  TEXT_REC_MODEL: 'languages/english/rec.onnx',
+  PADDLE_VL_ENCODER: 'encoder_model.onnx',
+  PADDLE_VL_DECODER: 'decoder_model_merged.onnx',
+  LATEX_DET_MODEL: 'mfd-v20240618.onnx',
 
   IMAGE_SIZE: 448,
   MEAN: [0.9545467],

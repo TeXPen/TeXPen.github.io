@@ -47,9 +47,9 @@ self.onmessage = async (e: MessageEvent) => {
 
         const optionsWithCallback = { ...options };
         if (debug) {
-          // TODO: Paragraph engine debug images?
-          // For now just allow simple pass through if supported
-          // optionsWithCallback.onPreprocess = ...
+          optionsWithCallback.onPreprocess = (debugImage: string) => {
+            self.postMessage({ type: "debug_image", id, data: debugImage });
+          };
         }
 
         const result = await paragraphEngine.inferParagraph(blob, optionsWithCallback);

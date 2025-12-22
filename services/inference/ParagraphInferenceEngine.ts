@@ -211,6 +211,8 @@ export class ParagraphInferenceEngine {
     options: SamplingOptions,
     signal?: AbortSignal
   ): Promise<ParagraphInferenceResult> {
+    // Stage 1: Initial Raw Image
+    await this.sendDebugImage(imageBlob, [], [], options);
 
     // 1. Latex Detection
     // Returns list of BBoxes for formulas
@@ -234,6 +236,9 @@ export class ParagraphInferenceEngine {
     // Filter out non-text (if splitConflict changed labels or we have garbage)
     textBBoxes = textBBoxes.filter(b => b.label === "text");
 
+    // Stage 2: Detection Result (Boxes only)
+    await this.sendDebugImage(imageBlob, textBBoxes, latexBBoxes, options, false);
+
     // 5. Slice Images
     const textSlices = await sliceFromImage(imageBlob, textBBoxes);
     const latexSlices = await sliceFromImage(imageBlob, latexBBoxes);
@@ -256,9 +261,69 @@ export class ParagraphInferenceEngine {
     // 8. Combine & Format
     const resultMarkdown = this.combineResults(textBBoxes, latexBBoxes);
 
+    // Stage 3: Final Result (Boxes + Labels)
+    await this.sendDebugImage(imageBlob, textBBoxes, latexBBoxes, options, true);
+
     return {
       markdown: resultMarkdown
     };
+  }
+
+  private async sendDebugImage(
+    imageBlob: Blob,
+    textBBoxes: BBox[],
+    latexBBoxes: BBox[],
+    options: SamplingOptions,
+    showLabels: boolean = true
+  ) {
+    if (!options.onPreprocess) return;
+
+    try {
+      const bitmap = await createImageBitmap(imageBlob);
+      const canvas = new OffscreenCanvas(bitmap.width, bitmap.height);
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.drawImage(bitmap, 0, 0);
+
+        // Draw Text BBoxes (Cyan)
+        ctx.strokeStyle = '#00ffff';
+        ctx.lineWidth = 3;
+        ctx.setLineDash([5, 5]);
+        for (const box of textBBoxes) {
+          ctx.strokeRect(box.x, box.y, box.w, box.h);
+        }
+
+        // Draw Latex BBoxes (Yellow/Gold)
+        ctx.strokeStyle = '#ffd700';
+        ctx.lineWidth = 4;
+        ctx.setLineDash([]);
+        for (const box of latexBBoxes) {
+          ctx.strokeRect(box.x, box.y, box.w, box.h);
+        }
+
+        // Draw content labels for debugging
+        if (showLabels) {
+          ctx.font = 'bold 16px sans-serif';
+          ctx.fillStyle = '#00ffff';
+          for (const box of textBBoxes) {
+            if (box.content) {
+              const label = box.content.substring(0, 15) + (box.content.length > 15 ? '...' : '');
+              ctx.fillText(label, box.x, box.y - 5);
+            }
+          }
+        }
+
+        const debugBlob = await canvas.convertToBlob();
+        const reader = new FileReader();
+        const debugDataUrl = await new Promise<string>((resolve) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(debugBlob);
+        });
+        options.onPreprocess(debugDataUrl);
+      }
+    } catch (e) {
+      console.error("Failed to generate debug image", e);
+    }
   }
 
   private async detectLatex(image: Blob): Promise<BBox[]> {

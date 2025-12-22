@@ -56,11 +56,12 @@ export async function sliceFromImage(imageBlob: Blob, bboxes: BBox[]): Promise<B
   ctx.drawImage(bitmap, 0, 0);
 
   for (const bbox of bboxes) {
-    // Ensure bounds
-    const x = Math.max(0, bbox.x);
-    const y = Math.max(0, bbox.y);
-    const w = Math.min(bitmap.width - x, bbox.w);
-    const h = Math.min(bitmap.height - y, bbox.h);
+    // Ensure bounds and add padding
+    const padding = 5;
+    const x = Math.max(0, bbox.x - padding);
+    const y = Math.max(0, bbox.y - padding);
+    const w = Math.min(bitmap.width - x, bbox.w + padding * 2);
+    const h = Math.min(bitmap.height - y, bbox.h + padding * 2);
 
     if (w <= 0 || h <= 0) {
       // Handle empty slice?
@@ -79,6 +80,9 @@ export async function sliceFromImage(imageBlob: Blob, bboxes: BBox[]): Promise<B
     const sliceCtx = sliceCanvas.getContext('2d', { willReadFrequently: true });
     if (!sliceCtx) continue;
 
+    // Ensure white background
+    sliceCtx.fillStyle = "#ffffff";
+    sliceCtx.fillRect(0, 0, w, h);
     sliceCtx.putImageData(region, 0, 0);
     slicedBlobs.push(await sliceCanvas.convertToBlob());
   }

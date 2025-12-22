@@ -26,7 +26,7 @@ export async function recPreprocess(imageBlob: Blob): Promise<Tensor> {
   if (newW > targetW) newW = targetW;
 
   // Draw background (padding)
-  ctx.fillStyle = "#000000"; // Black padding? Or Match standard.
+  ctx.fillStyle = "#ffffff"; // White padding for better OCR contrast
   // PaddleOCR normalization usually implies 0.5 mean, 0.5 std -> 0..1 input.
   // Let's draw image.
   ctx.drawImage(imgBitmap, 0, 0, newW, targetH);
@@ -53,4 +53,28 @@ export async function recPreprocess(imageBlob: Blob): Promise<Tensor> {
   }
 
   return new Tensor("float32", float32Data, [1, 3, targetH, targetW]);
+}
+
+/**
+ * Batched preprocessing for multiple images
+ */
+export async function recBatchPreprocess(imageBlobs: Blob[]): Promise<Tensor> {
+  if (imageBlobs.length === 0) {
+    throw new Error("No images provided for batch preprocessing");
+  }
+
+  const targetH = 48;
+  const targetW = 320;
+  const batchSize = imageBlobs.length;
+
+  const float32Data = new Float32Array(batchSize * 3 * targetH * targetW);
+
+  // Process each image sequentially (could be parallelized if needed)
+  for (let b = 0; b < batchSize; b++) {
+    const tensor = await recPreprocess(imageBlobs[b]);
+    const batchOffset = b * 3 * targetH * targetW;
+    float32Data.set(tensor.data as Float32Array, batchOffset);
+  }
+
+  return new Tensor("float32", float32Data, [batchSize, 3, targetH, targetW]);
 }

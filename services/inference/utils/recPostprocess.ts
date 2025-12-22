@@ -9,7 +9,7 @@
 // "0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\]^_`abcdefghijklmnopqrstuvwxyz{|}~!"#$%&'()*+,-./ "
 // Standard English Dict for PaddleOCR (95 keys + space)
 // Order: 0-9, a-z, A-Z, punctuation, space
-const DEFAULT_DICT = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~ ";
+const DEFAULT_DICT = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~©®℉№Ω℮™∆✓✔✗✘✕☑☒●▪▫◼▶◀⬆¤¦§¨ª«¬¯°²³´µ¶¸¹º»¼½¾¿×‐‑‒—―‖‗‘’‚‛“”„‟†‡‣․…‧‰‴‵‶‷‸‹›※‼‽‾−₤₡₹₽₴₿¢€£¥ⅠⅡⅢⅣⅤⅥⅦⅧⅨⅩⅪⅫⅰⅱⅲⅳⅴⅵⅶⅷⅸⅹⅺⅻ➀➁➂➃➄➅➆➇➈➉➊➋➌➍➎➏➐➑➒➓❶❷❸❹❺❻❼❽❾❿①②③④⑤⑥⑦⑧⑨⑩↑→↓↕←↔⇒⇐⇔∀∃∄∴∵∝∞∩∪∂∫∬∭∮∯∰∑∏√∛∜∱∲∳∶∷∼∖∗≈≠≡≤≥⊂⊃⊥⊾⊿□∥∋ƒ′″ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖØÙÚÛÜÝÞàáâãäåæçèéêëìíîïðñòóôõöøùúûüýþÿΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρςτυφχψωÅℏ⌀⍺⍵𝑢𝜓०‥︽﹥•÷∕∙⋅·±∓∟∠∡∢℧☺ ";
 
 export function recPostprocess(
   data: Float32Array,
@@ -21,7 +21,7 @@ export function recPostprocess(
   const numClasses = dims[2];
 
   // Diagnostic logging
-  // console.log(`Text Rec Output - SeqLen: ${seqLen}, NumClasses: ${numClasses}`);
+  console.log(`Text Rec Output - SeqLen: ${seqLen}, NumClasses: ${numClasses}, DataLen: ${data.length}`);
 
   const charIndices: number[] = [];
 
@@ -42,8 +42,7 @@ export function recPostprocess(
   }
 
   // CTC Decode: Drop repeats and blanks
-  // In many PaddleOCR ONNX exports, the blank token is at index 0.
-  // The dictionary characters then occupy indices 1 to N.
+  // Based on current results (e.g. "0s0"), blank index is confirmed at 0.
   const blankIdx = 0;
 
   let res = "";
@@ -51,7 +50,7 @@ export function recPostprocess(
 
   for (const idx of charIndices) {
     if (idx !== lastIdx && idx !== blankIdx) {
-      // Since blank is at 0, the characters from vocab[0...N-1] are at idx 1...N
+      // Use 1-based mapping (idx - 1) as blank is at 0.
       const vocabIdx = idx - 1;
       if (vocabIdx >= 0 && vocabIdx < vocab.length) {
         res += vocab[vocabIdx];
@@ -61,4 +60,27 @@ export function recPostprocess(
   }
 
   return res;
+}
+
+/**
+ * Batched postprocessing for multiple results
+ */
+export function recBatchPostprocess(
+  data: Float32Array,
+  dims: number[], // [BatchSize, SequenceLength, NumClasses]
+  vocab: string = DEFAULT_DICT
+): string[] {
+  const batchSize = dims[0];
+  const seqLen = dims[1];
+  const numClasses = dims[2];
+
+  const results: string[] = [];
+
+  for (let b = 0; b < batchSize; b++) {
+    const batchOffset = b * seqLen * numClasses;
+    const batchData = data.slice(batchOffset, batchOffset + seqLen * numClasses);
+    results.push(recPostprocess(batchData, [1, seqLen, numClasses], vocab));
+  }
+
+  return results;
 }

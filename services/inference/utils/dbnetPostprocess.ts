@@ -97,11 +97,35 @@ export function dbnetPostprocess(
       if (w < 5 || h < 5) continue;
 
       // Scale to original
+      let boxX = minX * scaleX;
+      let boxY = minY * scaleY;
+      let boxW = w * scaleX;
+      let boxH = h * scaleY;
+
+      // Unclip / Expand
+      // DBNet predicts a shrunk kernel (0.4 ratio). We need to expand it.
+      // Offset = (Area * unclip_ratio) / Perimeter
+      // Polygon offset formula, approx for rect:
+      const area = boxW * boxH;
+      const perimeter = 2 * (boxW + boxH);
+      const unclipRatio = 1.5; // Standard DBNet/PaddleOCR unclip ratio
+      const offset = (area * unclipRatio) / perimeter;
+
+      // Apply expansion
+      boxX = Math.max(0, boxX - offset);
+      boxY = Math.max(0, boxY - offset);
+      boxW = boxW + 2 * offset;
+      boxH = boxH + 2 * offset;
+
+      // Clamp to image boundaries
+      if (boxX + boxW > originalWidth) boxW = originalWidth - boxX;
+      if (boxY + boxH > originalHeight) boxH = originalHeight - boxY;
+
       boxes.push({
-        x: minX * scaleX,
-        y: minY * scaleY,
-        w: w * scaleX,
-        h: h * scaleY,
+        x: boxX,
+        y: boxY,
+        w: boxW,
+        h: boxH,
         label: 'text',
         confidence: 1.0 // Prob map gives confidence but aggregated
       });

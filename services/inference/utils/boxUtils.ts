@@ -7,7 +7,7 @@ export function sortBoxes(boxes: BBox[]): BBox[] {
   // Sort primarily by Y, then by X.
   // NOTE: This basic sort might need refinement for line grouping logic similar to Python's sort
   return [...boxes].sort((a, b) => {
-    if (Math.abs(a.y - b.y) < 10) { // Tolerance for same line
+    if (Math.abs(a.y - b.y) < 15) { // Tolerance for same line (increased to 15)
       return a.x - b.x;
     }
     return a.y - b.y;
@@ -21,7 +21,7 @@ export function sortBoxes(boxes: BBox[]): BBox[] {
  *   def same_row(self, other):
  *       return abs(self.p.y - other.p.y) < 10
  */
-function isSameRow(a: BBox, b: BBox, tolerance: number = 10): boolean {
+function isSameRow(a: BBox, b: BBox, tolerance: number = 15): boolean {
   return Math.abs(a.y - b.y) < tolerance;
 }
 
@@ -42,7 +42,8 @@ export function bboxMerge(sortedBBoxes: BBox[]): BBox[] {
     const curr = bboxes[i];
     const prevRightX = prev.x + prev.w; // ur_point.x
 
-    if (prevRightX <= curr.x || !isSameRow(prev, curr)) {
+    // Merge if gap is small (<= 20px) AND same row
+    if (prevRightX + 20 <= curr.x || !isSameRow(prev, curr)) {
       res.push(prev);
       prev = curr;
     } else {
@@ -97,7 +98,7 @@ export function splitConflict(ocrBBoxes: BBox[], latexBBoxes: BBox[]): BBox[] {
   // Sort logic for heap (min-heap in python based on default compare, likely tuples or object comparison)
   // Bbox comparison in python likely uses sort order (y, then x)
   const compareBoxes = (a: BBox, b: BBox) => {
-    if (Math.abs(a.y - b.y) < 10) return a.x - b.x;
+    if (Math.abs(a.y - b.y) < 15) return a.x - b.x;
     return a.y - b.y;
   };
 

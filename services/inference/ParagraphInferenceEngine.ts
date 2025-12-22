@@ -211,8 +211,8 @@ export class ParagraphInferenceEngine {
     options: SamplingOptions,
     signal?: AbortSignal
   ): Promise<ParagraphInferenceResult> {
-    // Stage 1: Initial Raw Image
-    await this.sendDebugImage(imageBlob, [], [], options);
+    // Stage 1: Initial Raw Image (Non-blocking)
+    this.sendDebugImage(imageBlob, [], [], options);
 
     // 1. Latex Detection
     // Returns list of BBoxes for formulas
@@ -236,8 +236,8 @@ export class ParagraphInferenceEngine {
     // Filter out non-text (if splitConflict changed labels or we have garbage)
     textBBoxes = textBBoxes.filter(b => b.label === "text");
 
-    // Stage 2: Detection Result (Boxes only)
-    await this.sendDebugImage(imageBlob, textBBoxes, latexBBoxes, options, false);
+    // Stage 2: Detection Result (Boxes only, Non-blocking)
+    this.sendDebugImage(imageBlob, textBBoxes, latexBBoxes, options, false);
 
     // 5. Slice Images
     const textSlices = await sliceFromImage(imageBlob, textBBoxes);
@@ -251,8 +251,10 @@ export class ParagraphInferenceEngine {
     // 7. Recognize Latex
     // Run Latex Rec Model (Formula Rec) on each slice SEQUENTIALLY to avoid session concurrency issues
     const latexResults: InferenceResult[] = [];
+    // Clean options for sub-inference to avoid callback recursion/flicker
+    const subOptions = { ...options, onPreprocess: undefined };
     for (const slice of latexSlices) {
-      latexResults.push(await this.latexRecEngine.infer(slice, options, signal));
+      latexResults.push(await this.latexRecEngine.infer(slice, subOptions, signal));
     }
     latexResults.forEach((res, i) => {
       latexBBoxes[i].content = res.latex;
@@ -261,8 +263,8 @@ export class ParagraphInferenceEngine {
     // 8. Combine & Format
     const resultMarkdown = this.combineResults(textBBoxes, latexBBoxes);
 
-    // Stage 3: Final Result (Boxes + Labels)
-    await this.sendDebugImage(imageBlob, textBBoxes, latexBBoxes, options, true);
+    // Stage 3: Final Result (Boxes + Labels, Non-blocking)
+    this.sendDebugImage(imageBlob, textBBoxes, latexBBoxes, options, true);
 
     return {
       markdown: resultMarkdown

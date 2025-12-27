@@ -4,7 +4,7 @@ import { inferenceService } from '../services/inference/InferenceService';
 
 import { MODEL_CONFIG, GENERATION_CONFIG } from '../services/inference/config';
 
-export function useInkModel(theme: 'light' | 'dark', provider: 'webgpu' | 'wasm' | null, customModelId: string = MODEL_CONFIG.ID) {
+export function useInkModel(theme: 'light' | 'dark', provider: 'webgpu' | 'wasm' | null, customModelId: string = MODEL_CONFIG.ID, initOptions?: { skipLatex?: boolean }) {
   // Sampling Defaults
   const [numCandidates, setNumCandidates] = useState<number>(GENERATION_CONFIG.NUM_BEAMS);
   const [doSample, setDoSample] = useState(true);
@@ -129,7 +129,7 @@ export function useInkModel(theme: 'light' | 'dark', provider: 'webgpu' | 'wasm'
           if (progress !== undefined) {
             setProgress(progress);
           }
-        }, { device: provider, modelId: customModelId });
+        }, { device: provider, modelId: customModelId, ...initOptions });
 
         if (!isCancelled) {
           setStatus('idle');

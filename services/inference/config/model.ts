@@ -10,17 +10,27 @@ export const MODEL_CONFIG = {
   // TEXT_RECOGNIZER_ID: 'monkt/paddleocr-onnx', // Deprecated
 
   // Filenames
-  PADDLE_VL_ENCODER: 'encoder_model.onnx',
-  PADDLE_VL_DECODER: 'decoder_model_merged.onnx',
+  PADDLE_VL_ENCODER: 'vision_transformer.onnx', // Keeping for compat, but should use VLM_COMPONENTS
+  PADDLE_VL_DECODER: 'llm.onnx',
+
+  VLM_COMPONENTS: {
+    VISION_PATCH_EMBED: 'vision_patch_embed.onnx',
+    VISION_TRANSFORMER: 'vision_transformer.onnx',
+    VISION_PROJECTOR: 'vision_projector.onnx',
+    TEXT_EMBED: 'text_embed.onnx',
+    LLM: 'llm.onnx',
+    POS_EMBED: 'pos_embed.npy'
+  },
   LATEX_DET_MODEL: 'mfd-v20240618.onnx',
 
-  IMAGE_SIZE: 448,
-  MEAN: [0.9545467],
-  STD: [0.15394445],
+  IMAGE_SIZE: 224, // Updated to match preprocess
+  MEAN: [0.485, 0.456, 0.406], // Update to match preprocess (ImageNet stats usually)
+  STD: [0.229, 0.224, 0.225],
 
   // Input/Output Names
   ENCODER_INPUT_NAME: 'pixel_values',
-  DECODER_INPUT_NAME: 'decoder_input_ids',
+  ENCODER_OUTPUT_NAME: 'image_embeds',
+  DECODER_INPUT_NAME: 'input_ids',
   DECODER_OUTPUT_NAME: 'logits',
 
   // Special Tokens

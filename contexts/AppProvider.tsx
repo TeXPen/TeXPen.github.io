@@ -11,7 +11,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const { theme } = useThemeContext();
     const [provider, setProvider] = useState<Provider | null>(null);
     const [customModelId, setCustomModelId] = useState<string>(MODEL_CONFIG.ID);
-    const [activeTab, setActiveTab] = useState<'draw' | 'upload'>('draw');
+    const [activeTab, setActiveTab] = useState<'draw' | 'upload' | 'vlm'>('vlm');
 
     useEffect(() => {
         isWebGPUAvailable().then(available => {
@@ -49,7 +49,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         isLoadedFromCache,
         isInitialized,
         isGenerationQueued,
-    } = useInkModel(theme, provider, customModelId);
+    } = useInkModel(theme, provider, customModelId, { skipLatex: activeTab === 'vlm' });
 
     // Use the extracted tab state hook
     const {

@@ -14,6 +14,7 @@ import DrawTab from './DrawTab';
 import UploadTab from './UploadTab';
 import { MobileBottomNav } from './MobileBottomNav';
 import { ConfirmationDialog } from '../common/ConfirmationDialog';
+import { VLMDemo } from '../VLMDemo';
 
 const Main: React.FC = () => {
     const [isPromptDismissed, setIsPromptDismissed] = useState(false);
@@ -207,13 +208,16 @@ const Main: React.FC = () => {
                                 onInference={handleInference}
                                 renderLoadingOverlay={renderLoadingOverlay}
                             />
-                        ) : (
+
+                        ) : activeTab === 'upload' ? (
                             <UploadTab
                                 onImageSelect={handleImageSelect}
                                 onConvert={handleUploadConvert}
                                 onUploadAnother={handleUploadAnother}
                                 renderLoadingOverlay={renderLoadingOverlay}
                             />
+                        ) : (
+                            <VLMDemo />
                         )}
 
                         <MobileBottomNav />

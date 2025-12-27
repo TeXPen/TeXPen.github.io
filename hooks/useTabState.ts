@@ -32,13 +32,16 @@ const initialTabState: TabState = {
 /**
  * Hook for managing tab-specific state (draw/upload tabs have separate state)
  */
-export function useTabState(activeTab: 'draw' | 'upload') {
+export function useTabState(activeTab: 'draw' | 'upload' | 'vlm') {
   const [drawState, setDrawState] = useState<TabState>(initialTabState);
   const [uploadState, setUploadState] = useState<TabState>(initialTabState);
 
   // Get current active state based on tab
-  const currentState = activeTab === 'draw' ? drawState : uploadState;
-  const setCurrentState = activeTab === 'draw' ? setDrawState : setUploadState;
+  // For VLM (or other tabs), we default to drawState or manage separately. 
+  // Since VLM demo is currently standalone, we can share drawState or ignore.
+  // Using drawState as fallback for now.
+  const currentState = activeTab === 'upload' ? uploadState : drawState;
+  const setCurrentState = activeTab === 'upload' ? setUploadState : setDrawState;
 
   // Derived values for context consumers
   const latex = currentState.latex;

@@ -11,9 +11,12 @@ self.onmessage = async (e: MessageEvent) => {
   try {
     switch (type) {
       case "init":
-        await engine.init((status, progress) => {
-          self.postMessage({ type: "progress", id, data: { status, progress } });
-        }, data as InferenceOptions);
+        const initOptions = data as InferenceOptions;
+        if (!initOptions.skipLatex) {
+          await engine.init((status, progress) => {
+            self.postMessage({ type: "progress", id, data: { status, progress } });
+          }, initOptions);
+        }
         // Also init paragraph engine if needed (loading extra models)
         await paragraphEngine.init((status, progress) => {
           self.postMessage({ type: "progress", id, data: { status, progress } });

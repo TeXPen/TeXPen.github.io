@@ -38,6 +38,11 @@ export interface ParagraphInferenceResult {
   debugImage?: string;
 }
 
+export interface VLMInferenceResult {
+  markdown: string;
+  timings?: Record<string, number>;
+}
+
 export interface SamplingOptions {
   do_sample?: boolean;
   temperature?: number;
@@ -50,6 +55,7 @@ export interface SamplingOptions {
 export interface InferenceOptions {
   device?: 'webgpu' | 'wasm';
   modelId?: string;
+  skipLatex?: boolean;
 }
 
 export interface BeamState {

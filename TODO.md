@@ -4,6 +4,7 @@ Bugs
 
 Behavior
 - [ ] Switch model to PaddleOCR-VL for best results https://huggingface.co/PaddlePaddle/PaddleOCR-VL
+- [ ] Replicate the PaddleOCR-VL demo on HuggingFace, port it to a static implementation with WebGPU/WASM
 
 Features
 - [ ] add a button in settings to flush the models download in addition to the verify & repair button?

@@ -1,8 +1,8 @@
 import { Tensor } from "onnxruntime-web";
 
-const MEAN = [0.485, 0.456, 0.406];
-const STD = [0.229, 0.224, 0.225];
-const SIZE = 1024; // Use high-res for Paragraphs
+const MEAN = [0.5, 0.5, 0.5];
+const STD = [0.5, 0.5, 0.5];
+const SIZE = 378; // Matches pos_embed 27x27 grid
 
 export async function preprocessPaddleVL(imageBlob: Blob): Promise<Tensor> {
   const bitmap = await createImageBitmap(imageBlob);

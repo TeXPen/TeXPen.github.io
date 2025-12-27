@@ -67,8 +67,8 @@ export interface AppContextType {
     loadFromHistory: (item: HistoryItem) => void;
 
     // Tab Interface
-    activeTab: 'draw' | 'upload';
-    setActiveTab: (tab: 'draw' | 'upload') => void;
+    activeTab: 'draw' | 'upload' | 'vlm';
+    setActiveTab: (tab: 'draw' | 'upload' | 'vlm') => void;
 
     // Session
     sessionId: string;

@@ -57,6 +57,13 @@ const Header: React.FC = () => {
                     icon={<UploadIcon />}
                     variant="pill"
                 />
+                <IconButton
+                    label="VLM"
+                    onClick={() => setActiveTab('vlm')}
+                    isActive={activeTab === 'vlm'}
+                    icon={<UploadIcon />}
+                    variant="pill"
+                />
             </div>
 
             {/* Right: Controls */}

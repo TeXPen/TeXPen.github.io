@@ -291,7 +291,10 @@ export class VLMInferenceEngine {
   }
 
   public async init(onProgress?: (status: string, progress?: number) => void, onCheckpoint?: (phase: string) => void) {
-    if (this.initialized) return;
+    if (this.initialized) {
+      if (onProgress) onProgress("Ready", 100);
+      return;
+    }
 
     // If initialization is already in progress, wait for it.
     if (this.initPromise) {
@@ -302,7 +305,9 @@ export class VLMInferenceEngine {
     this.initPromise = (async () => {
       this.loading = true;
       try {
-        // Ensure clean state before starting
+        // Ensure clean state before starting IF NOT already initialized
+        // This dispose() is only for hard resets/recovery. 
+        // Normal preloads or multiple calls while loading are handled above.
         await this.dispose();
 
         // Simplify Init Logic: Just use current strategy

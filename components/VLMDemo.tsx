@@ -59,11 +59,20 @@ export const VLMDemo: React.FC = () => {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
-    // Restoration Effect
+    const initializedRef = useRef(false);
+
+    // Consolidated Initialization & Restoration Effect
     useEffect(() => {
-        const restoreState = async () => {
+        if (initializedRef.current) return;
+        initializedRef.current = true;
+
+        const performInitialLoad = async () => {
             const flag = sessionStorage.getItem("vlm_restore_needed");
-            if (flag === "true") {
+            const isRestoring = flag === "true";
+
+            setLoading(true);
+
+            if (isRestoring) {
                 console.log("[VLMDemo] restoring state after reload...");
                 setStatus("Restoring previous session...");
 
@@ -77,7 +86,7 @@ export const VLMDemo: React.FC = () => {
                     const idx = parseInt(savedStrategy, 10);
                     if (!isNaN(idx)) {
                         console.log(`[VLMDemo] Forcing strategy index: ${idx}`);
-                        vlmEngine.setStrategyIndex(idx);
+                        await vlmEngine.setStrategyIndex(idx);
                     }
                 }
 
@@ -90,23 +99,59 @@ export const VLMDemo: React.FC = () => {
 
                         // Auto-run?
                         if (sessionStorage.getItem("vlm_autorun") === "true") {
-                            setTimeout(() => handleRun(blob, savedPrompt || "Describe this image."), 500);
+                            // Run after engine init
+                            setTimeout(async () => {
+                                setStatus("Initializing for Auto-run...");
+                                try {
+                                    await vlmEngine.init((s, p) => {
+                                        setStatus(s);
+                                        if (p !== undefined) setProgress(p);
+                                    }, (phase) => {
+                                        sessionStorage.setItem("vlm_phase", phase);
+                                    });
+                                    handleRun(blob, savedPrompt || "Describe this image.");
+                                } catch (e) {
+                                    console.error("Auto-run init failed", e);
+                                    setLoading(false);
+                                }
+                            }, 100);
                         }
                     } catch (e) {
                         console.error("Failed to restore image", e);
                     }
                 }
 
-                // Cleanup
+                // Cleanup session storage early to prevent re-restoration on unrelated reloads
                 sessionStorage.removeItem("vlm_restore_needed");
                 sessionStorage.removeItem("vlm_prompt");
                 sessionStorage.removeItem("vlm_image");
                 sessionStorage.removeItem("vlm_next_strategy");
                 sessionStorage.removeItem("vlm_autorun");
+
+                if (sessionStorage.getItem("vlm_autorun") !== "true") {
+                    setLoading(false);
+                    setStatus("Ready");
+                }
+            } else {
+                // Standard Preload
+                try {
+                    setStatus("Preloading Models...");
+                    await vlmEngine.init((s, p) => {
+                        setStatus(s);
+                        if (p !== undefined) setProgress(p);
+                    }, (phase) => {
+                        sessionStorage.setItem("vlm_phase", phase);
+                    });
+                    setStatus("Ready");
+                    setLoading(false);
+                } catch (e) {
+                    console.error("Preload failed", e);
+                    setLoading(false);
+                }
             }
         };
 
-        restoreState();
+        performInitialLoad();
 
         const unhandledHandler = (event: PromiseRejectionEvent) => {
             const reason = event.reason;
@@ -125,7 +170,7 @@ export const VLMDemo: React.FC = () => {
                 const currentIdx = vlmEngine.getStrategyIndex();
                 const nextIdx = determineNextStrategy(currentIdx);
 
-                if (nextIdx > 4 || (nextIdx === 4 && currentIdx === 4)) { // Max strategy index
+                if (nextIdx > 4 || (nextIdx === 4 && currentIdx === 4)) {
                     console.error("All strategies failed. Stopping auto-reload.");
                     setStatus("Critical Error: All recovery strategies failed.");
                     setLoading(false);
@@ -133,8 +178,6 @@ export const VLMDemo: React.FC = () => {
                 }
 
                 sessionStorage.setItem("vlm_next_strategy", nextIdx.toString());
-
-                // Use robust reload
                 forceReload();
             }
         };
@@ -143,36 +186,7 @@ export const VLMDemo: React.FC = () => {
 
         return () => {
             window.removeEventListener("unhandledrejection", unhandledHandler);
-            // vlmEngine.dispose(); // Do not auto-dispose on unmount
         };
-    }, []);
-
-    // Helper for initial load (separate from restoreState to avoid double triggering if logic overlaps)
-    useEffect(() => {
-        // Preload models on mount if not already loaded
-        const preload = async () => {
-            if (sessionStorage.getItem("vlm_restore_needed") === "true") return; // Let restore logic handle it
-
-            try {
-                // If we are already initialized or loading, this will safely attach/wait due to our engine fix.
-                // We want to show progress if possible.
-                setLoading(true);
-                setStatus("Preloading Models...");
-                await vlmEngine.init((s, p) => {
-                    setStatus(s);
-                    if (p !== undefined) setProgress(p);
-                }, (phase) => {
-                    sessionStorage.setItem("vlm_phase", phase);
-                });
-                setStatus("Ready");
-                setLoading(false);
-            } catch (e) {
-                console.error("Preload invalid", e);
-                setLoading(false);
-            }
-        };
-
-        preload();
     }, []);
 
     // Keep a ref to image for the event listener (state is stale in useEffect)

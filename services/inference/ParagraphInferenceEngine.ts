@@ -24,7 +24,8 @@ export class ParagraphInferenceEngine {
   ): Promise<ParagraphInferenceResult> {
 
     // Delegate to VLM Engine
-    const vlmResult = await this.vlmEngine.inferVLM(imageBlob);
+    // Fixed: calling runInference instead of non-existent inferVLM
+    const vlmResult = await this.vlmEngine.runInference(imageBlob, "Perform OCR on this image and return as markdown.", undefined, signal);
 
     return {
       markdown: vlmResult.markdown,

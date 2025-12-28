@@ -58,6 +58,7 @@ export interface InferenceOptions {
   device?: 'webgpu' | 'wasm';
   modelId?: string;
   skipLatex?: boolean;
+  skipVLM?: boolean;
 }
 
 export interface BeamState {

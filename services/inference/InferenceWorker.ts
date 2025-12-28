@@ -18,9 +18,11 @@ self.onmessage = async (e: MessageEvent) => {
           }, initOptions);
         }
         // Also init paragraph engine if needed (loading extra models)
-        await paragraphEngine.init((status, progress) => {
-          self.postMessage({ type: "progress", id, data: { status, progress } });
-        });
+        if (!initOptions.skipVLM) {
+          await paragraphEngine.init((status, progress) => {
+            self.postMessage({ type: "progress", id, data: { status, progress } });
+          });
+        }
         self.postMessage({ type: "success", id, data: null });
         break;
 

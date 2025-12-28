@@ -224,13 +224,19 @@ export const VLMDemo: React.FC = () => {
 
         try {
             const currentIdx = vlmEngine.getStrategyIndex();
-            // Wait, double check logic: determineNextStrategy uses currentIdx. 
-            // If determining next strategy was handled in saveState, we probably don't need check here? 
-            // But we do need to check if we SHOULD restart.
-
-            // Re-calc nextIdx just to check termination condition
             const nextIdx = determineNextStrategy(currentIdx);
-            if (nextIdx > 1 || (nextIdx === 1 && currentIdx === 1)) return;
+
+            if (nextIdx > 1 || (nextIdx === 1 && currentIdx === 1)) {
+                console.error("All strategies failed. Stopping auto-reload.");
+                setStatus("Critical Error: All recovery strategies failed.");
+                return;
+            }
+
+            // Downgrade engine state immediately for next manual attempt
+            console.log(`[VLMDemo] Downgrading engine to strategy index: ${nextIdx}`);
+            await vlmEngine.setStrategyIndex(nextIdx);
+            await vlmEngine.dispose(); // Force re-init on next run
+            setStatus(`Error detected. Fallback to Strategy ${nextIdx + 1} active.`);
 
             await Promise.race([saveState(), timeout]);
             console.log("State save attempt finished (or timed out). Auto-reload suppressed for debugging.");

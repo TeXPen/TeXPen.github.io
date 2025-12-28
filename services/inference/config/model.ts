@@ -5,6 +5,7 @@ export const MODEL_CONFIG = {
   // Models
   PADDLE_VL_ID: 'PaddlePaddle/PaddleOCR-VL',
   PADDLE_VL_ONNX_REPO: 'USER_NAME/REPO_NAME', // Updated by user after upload
+  PADDLE_VL_SERVER_URL: '', // e.g. http://localhost:8080/layout-parsing
   LATEX_DET_ID: 'breezedeus/pix2text-mfd',
   // TEXT_DETECTOR_ID: 'monkt/paddleocr-onnx', // Deprecated
   // TEXT_RECOGNIZER_ID: 'monkt/paddleocr-onnx', // Deprecated
@@ -18,7 +19,8 @@ export const MODEL_CONFIG = {
     VISION_TRANSFORMER: 'vision_transformer.onnx',
     VISION_PROJECTOR: 'vision_projector.onnx',
     TEXT_EMBED: 'text_embed.onnx',
-    LLM: 'llm.onnx',
+    LLM: 'llm_init.onnx',
+    LLM_WITH_PAST: 'llm_with_past.onnx',
     POS_EMBED: 'pos_embed.npy'
   },
 
@@ -32,6 +34,13 @@ export const MODEL_CONFIG = {
   IMAGE_SIZE: 378,
   MEAN: [0.5, 0.5, 0.5],
   STD: [0.5, 0.5, 0.5],
+  VLM_MEAN: [0.48145466, 0.4578275, 0.40821073],
+  VLM_STD: [0.26862954, 0.26130258, 0.27577711],
+  VLM_PATCH_SIZE: 14,
+  VLM_MERGE_SIZE: 2,
+  VLM_MIN_PIXELS: 28 * 28 * 130,
+  VLM_MAX_PIXELS: 28 * 28 * 1280,
+  VLM_TOKENS_PER_SECOND: 2,
 
   // Input/Output Names
   ENCODER_INPUT_NAME: 'pixel_values',

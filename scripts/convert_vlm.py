@@ -1,9 +1,21 @@
 import os
 import torch
 from transformers import AutoModel, AutoConfig
+import transformers.utils as hf_utils
+import transformers.utils.generic as hf_generic
 import numpy as np
 import math
 from torch.nn import functional as F
+
+ONNX_OPSET_VERSION = 18
+
+
+def _no_check_model_inputs(fn):
+    return fn
+
+
+hf_utils.check_model_inputs = _no_check_model_inputs
+hf_generic.check_model_inputs = _no_check_model_inputs
 
 
 def scaled_dot_product_attention(
@@ -77,7 +89,7 @@ def convert_vision_patch_embedding(model, output_dir):
             "pixel_values": {0: "batch", 2: "height", 3: "width"},
             "patch_features": {0: "batch", 2: "height", 3: "width"},
         },
-        opset_version=14,
+        opset_version=ONNX_OPSET_VERSION,
     )
 
 
@@ -117,7 +129,7 @@ def convert_vision_transformer(model, output_dir):
             "inputs_embeds": {0: "batch", 1: "seq_len"},
             "last_hidden_state": {0: "batch", 1: "seq_len"},
         },
-        opset_version=14,
+        opset_version=ONNX_OPSET_VERSION,
     )
 
 
@@ -147,7 +159,7 @@ def convert_projector(model, output_dir):
             "image_features": {0: "batch", 1: "seq_len"},
             "projected_features": {0: "batch", 1: "seq_len"},
         },
-        opset_version=14,
+        opset_version=ONNX_OPSET_VERSION,
     )
 
 
@@ -179,14 +191,30 @@ def convert_text_embedding(model, output_dir):
             "input_ids": {0: "batch", 1: "seq_len"},
             "inputs_embeds": {0: "batch", 1: "seq_len"},
         },
-        opset_version=14,
+        opset_version=ONNX_OPSET_VERSION,
     )
 
 
-def convert_llm(model, output_dir):
-    print("  Exporting LLM (Ernie)...")
+def _flatten_past_key_values(past_key_values):
+    flat = []
+    for idx, (k, v) in enumerate(past_key_values):
+        flat.append((f"present.{idx}.key", k))
+        flat.append((f"present.{idx}.value", v))
+    return flat
 
-    class LLMWrapper(torch.nn.Module):
+
+def _past_input_names(num_layers):
+    names = []
+    for i in range(num_layers):
+        names.append(f"past_key_values.{i}.key")
+        names.append(f"past_key_values.{i}.value")
+    return names
+
+
+def convert_llm(model, output_dir):
+    print("  Exporting LLM (Ernie) with cache...")
+
+    class LLMInitWrapper(torch.nn.Module):
         def __init__(self, model):
             super().__init__()
             self.model = model.model
@@ -194,38 +222,102 @@ def convert_llm(model, output_dir):
 
         def forward(self, inputs_embeds, attention_mask, position_ids):
             outputs = self.model(
-                input_ids=None,
-                inputs_embeds=inputs_embeds,
-                attention_mask=attention_mask,
-                position_ids=position_ids,
-                use_cache=False,
-                return_dict=True,
+                None,  # input_ids
+                attention_mask,
+                position_ids,
+                None,  # past_key_values
+                inputs_embeds,
+                None,  # cache_position
+                True,  # use_cache
+                False,  # output_attentions
             )
-            hidden_states = outputs.last_hidden_state
-            logits = self.lm_head(hidden_states)
-            return logits
+            logits = self.lm_head(outputs.last_hidden_state)
+            past = outputs.past_key_values
+            return (logits, *[t for _, t in _flatten_past_key_values(past)])
 
-    wrapper = LLMWrapper(model)
+    class LLMWithPastWrapper(torch.nn.Module):
+        def __init__(self, model):
+            super().__init__()
+            self.model = model.model
+            self.lm_head = model.lm_head
+
+        def forward(self, inputs_embeds, attention_mask, position_ids, *past_key_values):
+            # Rebuild past_key_values tuple
+            num_layers = len(past_key_values) // 2
+            past = []
+            for i in range(num_layers):
+                past.append((past_key_values[2 * i], past_key_values[2 * i + 1]))
+
+            outputs = self.model(
+                None,  # input_ids
+                attention_mask,
+                position_ids,
+                tuple(past),
+                inputs_embeds,
+                None,  # cache_position
+                True,  # use_cache
+                False,  # output_attentions
+            )
+            logits = self.lm_head(outputs.last_hidden_state)
+            past_out = outputs.past_key_values
+            return (logits, *[t for _, t in _flatten_past_key_values(past_out)])
 
     hidden_size = model.config.hidden_size
+    num_layers = model.config.num_hidden_layers
+    num_heads = model.config.num_attention_heads
+    head_dim = hidden_size // num_heads
+
     seq_len = 32
+    past_seq = 16
+
     dummy_embeds = torch.randn(1, seq_len, hidden_size).float()
     dummy_mask = torch.ones(1, seq_len).float()
     dummy_pos_ids = torch.arange(seq_len).unsqueeze(0).repeat(3, 1, 1).long()
 
+    past_key_values = []
+    for _ in range(num_layers):
+        k = torch.zeros(1, num_heads, past_seq, head_dim).float()
+        v = torch.zeros(1, num_heads, past_seq, head_dim).float()
+        past_key_values.extend([k, v])
+
+    # Init model (no past inputs)
+    init_wrapper = LLMInitWrapper(model)
+    init_output_names = ["logits"] + _past_input_names(num_layers)
     torch.onnx.export(
-        wrapper,
+        init_wrapper,
         (dummy_embeds, dummy_mask, dummy_pos_ids),
-        os.path.join(output_dir, "llm.onnx"),
+        os.path.join(output_dir, "llm_init.onnx"),
         input_names=["inputs_embeds", "attention_mask", "position_ids"],
-        output_names=["logits"],
+        output_names=init_output_names,
         dynamic_axes={
             "inputs_embeds": {0: "batch", 1: "seq_len"},
             "attention_mask": {0: "batch", 1: "seq_len"},
             "position_ids": {1: "batch", 2: "seq_len"},
             "logits": {0: "batch", 1: "seq_len"},
+            **{name: {0: "batch", 2: "past_seq"} for name in _past_input_names(num_layers)},
         },
-        opset_version=14,
+        opset_version=ONNX_OPSET_VERSION,
+        dynamo=False,
+    )
+
+    # Cached model (with past inputs)
+    with_past_wrapper = LLMWithPastWrapper(model)
+    with_past_output_names = ["logits"] + _past_input_names(num_layers)
+    torch.onnx.export(
+        with_past_wrapper,
+        (dummy_embeds, dummy_mask, dummy_pos_ids, *past_key_values),
+        os.path.join(output_dir, "llm_with_past.onnx"),
+        input_names=["inputs_embeds", "attention_mask", "position_ids"] + _past_input_names(num_layers),
+        output_names=with_past_output_names,
+        dynamic_axes={
+            "inputs_embeds": {0: "batch", 1: "seq_len"},
+            "attention_mask": {0: "batch", 1: "seq_len"},
+            "position_ids": {1: "batch", 2: "seq_len"},
+            "logits": {0: "batch", 1: "seq_len"},
+            **{name: {0: "batch", 2: "past_seq"} for name in _past_input_names(num_layers)},
+        },
+        opset_version=ONNX_OPSET_VERSION,
+        dynamo=False,
     )
 
 

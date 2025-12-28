@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { VLMInferenceEngine } from '../services/inference/VLMInferenceEngine';
+import { VLMWorkerClient as VLMInferenceEngine } from '../services/inference/VLMWorkerClient';
 import { VLMInferenceResult } from '../services/inference/types';
 
 const vlmEngine = new VLMInferenceEngine();
@@ -21,6 +21,31 @@ const forceReload = () => {
         console.error("Standard reload failed, forcing location assignment", e);
         window.location.href = window.location.href;
     }
+};
+
+const determineNextStrategy = (currentIdx: number): number => {
+    const phase = sessionStorage.getItem("vlm_phase");
+    console.log(`[VLMDemo] Recovery Analysis: Crash at phase '${phase}', Current Strategy ${currentIdx}`);
+
+    if (phase === 'LOADING_LLM') {
+        // LLM failed on GPU. Must move LLM to CPU.
+        // Strategies 0-3 have LLM on GPU. Strategy 4 is CPU_ONLY.
+        console.log("-> Jump to CPU_ONLY (Index 4)");
+        return 4;
+    }
+
+    if (phase === 'LOADING_VISION') {
+        // Vision failed, but LLM likely loaded ok (since it loads before Vision now).
+        // Try to keep LLM on GPU, but move Vision to CPU.
+        // Strategy 2 (LLM_GPU) does exactly this.
+        if (currentIdx < 2) {
+            console.log("-> Jump to LLM_GPU (Index 2)");
+            return 2;
+        }
+    }
+
+    // Default: Linear backoff
+    return currentIdx + 1;
 };
 
 export const VLMDemo: React.FC = () => {
@@ -98,7 +123,16 @@ export const VLMDemo: React.FC = () => {
                 sessionStorage.setItem("vlm_autorun", "true");
 
                 const currentIdx = vlmEngine.getStrategyIndex();
-                sessionStorage.setItem("vlm_next_strategy", (currentIdx + 1).toString());
+                const nextIdx = determineNextStrategy(currentIdx);
+
+                if (nextIdx > 4 || (nextIdx === 4 && currentIdx === 4)) { // Max strategy index
+                    console.error("All strategies failed. Stopping auto-reload.");
+                    setStatus("Critical Error: All recovery strategies failed.");
+                    setLoading(false);
+                    return;
+                }
+
+                sessionStorage.setItem("vlm_next_strategy", nextIdx.toString());
 
                 // Use robust reload
                 forceReload();
@@ -109,8 +143,36 @@ export const VLMDemo: React.FC = () => {
 
         return () => {
             window.removeEventListener("unhandledrejection", unhandledHandler);
-            vlmEngine.dispose();
+            // vlmEngine.dispose(); // Do not auto-dispose on unmount
         };
+    }, []);
+
+    // Helper for initial load (separate from restoreState to avoid double triggering if logic overlaps)
+    useEffect(() => {
+        // Preload models on mount if not already loaded
+        const preload = async () => {
+            if (sessionStorage.getItem("vlm_restore_needed") === "true") return; // Let restore logic handle it
+
+            try {
+                // If we are already initialized or loading, this will safely attach/wait due to our engine fix.
+                // We want to show progress if possible.
+                setLoading(true);
+                setStatus("Preloading Models...");
+                await vlmEngine.init((s, p) => {
+                    setStatus(s);
+                    if (p !== undefined) setProgress(p);
+                }, (phase) => {
+                    sessionStorage.setItem("vlm_phase", phase);
+                });
+                setStatus("Ready");
+                setLoading(false);
+            } catch (e) {
+                console.error("Preload invalid", e);
+                setLoading(false);
+            }
+        };
+
+        preload();
     }, []);
 
     // Keep a ref to image for the event listener (state is stale in useEffect)
@@ -145,14 +207,32 @@ export const VLMDemo: React.FC = () => {
             sessionStorage.setItem("vlm_autorun", "true");
 
             const currentIdx = vlmEngine.getStrategyIndex();
+            const nextIdx = determineNextStrategy(currentIdx);
+
+            if (nextIdx > 4 || (nextIdx === 4 && currentIdx === 4)) {
+                console.error("All strategies failed. Stopping auto-reload.");
+                setStatus("Critical Error: All recovery strategies failed.");
+                // We don't reload here, just letting the error stay visible
+                return;
+            }
+
             // Downgrade for next run
-            sessionStorage.setItem("vlm_next_strategy", (currentIdx + 1).toString());
+            sessionStorage.setItem("vlm_next_strategy", nextIdx.toString());
         };
 
         // Race: Try to save, but reload anyway after 500ms
         const timeout = new Promise((resolve) => setTimeout(resolve, 500));
 
         try {
+            const currentIdx = vlmEngine.getStrategyIndex();
+            // Wait, double check logic: determineNextStrategy uses currentIdx. 
+            // If determining next strategy was handled in saveState, we probably don't need check here? 
+            // But we do need to check if we SHOULD restart.
+
+            // Re-calc nextIdx just to check termination condition
+            const nextIdx = determineNextStrategy(currentIdx);
+            if (nextIdx > 4 || (nextIdx === 4 && currentIdx === 4)) return;
+
             await Promise.race([saveState(), timeout]);
             console.log("State save attempt finished (or timed out). Reloading.");
             forceReload();
@@ -175,10 +255,17 @@ export const VLMDemo: React.FC = () => {
             await vlmEngine.init((s, p) => {
                 setStatus(s);
                 if (p !== undefined) setProgress(p);
+            }, (phase) => {
+                sessionStorage.setItem("vlm_phase", phase);
             });
 
             setStatus("Running Inference...");
-            const res = await vlmEngine.inferVLM(imgToUse, promptToUse);
+            const res = await vlmEngine.runInference(imgToUse, promptToUse, (token, fullText) => {
+                setResult(prev => ({
+                    markdown: fullText,
+                    timings: prev?.timings || {}
+                }));
+            });
             setResult(res);
             setStatus("Done");
         } catch (e) {
@@ -245,17 +332,36 @@ export const VLMDemo: React.FC = () => {
                         />
                     </div>
 
-                    <button
-                        className={`w-full py-2 px-4 rounded font-bold text-white transition ${loading || !image ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
-                        onClick={() => handleRun()}
-                        disabled={loading || !image}
-                    >
-                        {loading ? 'Processing...' : 'Run Inference'}
-                    </button>
+                    <div className="flex gap-2">
+                        <button
+                            className={`flex-1 py-2 px-4 rounded font-bold text-white transition ${loading || !image ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
+                            onClick={() => handleRun()}
+                            disabled={loading || !image}
+                        >
+                            {loading ? 'Processing...' : 'Run Inference'}
+                        </button>
+                        <button
+                            className="py-2 px-4 rounded font-bold text-gray-700 bg-gray-200 hover:bg-gray-300 transition dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                            onClick={async () => {
+                                await vlmEngine.dispose();
+                                setStatus("Models Unloaded");
+                                setProgress(0);
+                            }}
+                            disabled={loading}
+                            title="Unload models from memory"
+                        >
+                            Unload
+                        </button>
+                    </div>
 
                     {loading && (
                         <div className="mt-4">
-                            <div className="text-sm text-gray-600 dark:text-gray-400 mb-1">{status}</div>
+                            <div className="flex justify-between items-center mb-1">
+                                <div className="text-sm text-gray-600 dark:text-gray-400">{status}</div>
+                                <div className="text-xs font-bold text-blue-600 uppercase">
+                                    Strategy: {vlmEngine.getStrategyIndex() + 1}/5
+                                </div>
+                            </div>
                             <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">
                                 <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" style={{ width: `${progress}%` }}></div>
                             </div>

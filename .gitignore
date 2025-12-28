@@ -34,3 +34,4 @@ PaddleOCR/
 *.pth
 *.pdparams
 *.wasm
+*.data

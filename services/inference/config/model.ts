@@ -21,6 +21,12 @@ export const MODEL_CONFIG = {
     LLM: 'llm.onnx',
     POS_EMBED: 'pos_embed.npy'
   },
+
+  // Quantization Settings
+  // Quantization Settings
+  QUANTIZED: true, // Enable to use quantized variants for large models
+  QUANTIZED_SUFFIX: '_q4.onnx', // Suffix for quantized files. could be '_awq.onnx' if using AutoAWQ export
+
   LATEX_DET_MODEL: 'mfd-v20240618.onnx',
 
   IMAGE_SIZE: 224, // Updated to match preprocess

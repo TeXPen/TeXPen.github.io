@@ -4,7 +4,7 @@ import { AutoTokenizer, PreTrainedTokenizer } from "@huggingface/transformers";
 import { preprocessPaddleVL } from "./utils/paddleVLPreprocess";
 import { MODEL_CONFIG } from "./config";
 import { downloadManager } from "../downloader/DownloadManager";
-import { VLMInferenceResult } from "./types";
+import { VLMInferenceResult, TokenCallback } from "./types";
 import { paddleVLPostprocess } from "./utils/paddleVLPostprocess";
 
 env.wasm.numThreads = 1; // WASM stability
@@ -59,6 +59,7 @@ export class VLMInferenceEngine {
   private initialized = false;
   private loading = false;
   private sizeCache: Partial<Record<keyof typeof MODEL_CONFIG.VLM_COMPONENTS, number>> = {};
+  private initPromise: Promise<void> | null = null;
 
   private sessionOptions: InferenceSession.SessionOptions = {
     executionProviders: ['webgpu', 'wasm'], // Use WebGPU if available
@@ -74,7 +75,15 @@ export class VLMInferenceEngine {
   ) {
     if (sessionProp && this[sessionProp]) return; // Already loaded
 
-    const filename = MODEL_CONFIG.VLM_COMPONENTS[key];
+    const baseFilename = MODEL_CONFIG.VLM_COMPONENTS[key];
+    let filename: string = baseFilename;
+
+    // Check if this component should be quantized
+    // Typically we only quantize the heavy lifters: Transformer and LLM
+    if (MODEL_CONFIG.QUANTIZED && (key === 'VISION_TRANSFORMER' || key === 'LLM')) {
+      filename = baseFilename.replace('.onnx', MODEL_CONFIG.QUANTIZED_SUFFIX);
+    }
+
     const origin = typeof window !== 'undefined' ? window.location.origin : self.location.origin;
     const path = `${origin}/models/vlm/${filename}`;
 
@@ -166,10 +175,17 @@ export class VLMInferenceEngine {
   }
 
   // Strategy definitions
-  private strategies: ('ALL_GPU' | 'LLM_GPU' | 'CPU_ONLY')[] = ['ALL_GPU', 'LLM_GPU', 'CPU_ONLY'];
+  // 1. ALL_GPU: All models on WebGPU (Most aggressive, highest VRAM)
+  // 2. ALL_GPU_NO_EMBED: Vision + LLM on GPU, Text Embed on CPU (Save ~300-500MB VRAM)
+  // 3. LLM_GPU: LLM + Text Embed on GPU, Vision on CPU (Standard "Balanced", saves ~1.8GB VRAM)
+  // 4. LLM_ONLY_GPU: LLM on GPU, Vision + Text Embed on CPU (Saves slightly more VRAM than #3)
+  // 5. CPU_ONLY: Everything on CPU (Failsafe)
+  private strategies: ('ALL_GPU' | 'ALL_GPU_NO_EMBED' | 'LLM_GPU' | 'LLM_ONLY_GPU' | 'CPU_ONLY')[] =
+    ['ALL_GPU', 'ALL_GPU_NO_EMBED', 'LLM_GPU', 'LLM_ONLY_GPU', 'CPU_ONLY'];
+
   private currentStrategyIndex = 0; // Default to ALL_GPU
 
-  private get currentStrategy(): 'ALL_GPU' | 'LLM_GPU' | 'CPU_ONLY' {
+  public get currentStrategy(): 'ALL_GPU' | 'ALL_GPU_NO_EMBED' | 'LLM_GPU' | 'LLM_ONLY_GPU' | 'CPU_ONLY' {
     return this.strategies[this.currentStrategyIndex];
   }
 
@@ -203,7 +219,12 @@ export class VLMInferenceEngine {
   private async getComponentSizeBytes(key: keyof typeof MODEL_CONFIG.VLM_COMPONENTS): Promise<number> {
     if (this.sizeCache[key]) return this.sizeCache[key]!;
 
-    const filename = MODEL_CONFIG.VLM_COMPONENTS[key];
+    const baseFilename = MODEL_CONFIG.VLM_COMPONENTS[key];
+    let filename: string = baseFilename;
+    if (MODEL_CONFIG.QUANTIZED && (key === 'VISION_TRANSFORMER' || key === 'LLM')) {
+      filename = baseFilename.replace('.onnx', MODEL_CONFIG.QUANTIZED_SUFFIX);
+    }
+
     const origin = typeof window !== 'undefined' ? window.location.origin : self.location.origin;
     const path = `${origin}/models/vlm/${filename}`;
 
@@ -213,19 +234,27 @@ export class VLMInferenceEngine {
       'vision_projector.onnx': 24047,
       'text_embed.onnx': 313,
       'llm.onnx': 2079423,
-      'pos_embed.npy': 3359360
+      'pos_embed.npy': 3359360,
+
+      // Quantized Hints (Approx 50% of FP32 or less for INT4)
+      'vision_transformer_q4.onnx': 1089562,
+      'llm_q4.onnx': 1039711
     };
     const dataHints: Record<string, number> = {
       'vision_patch_embed.onnx.data': 2775040,
       'vision_transformer.onnx.data': 1647222784,
       'vision_projector.onnx.data': 103874560,
       'text_embed.onnx.data': 423624704,
-      'llm.onnx.data': 1443037184
+      'llm.onnx.data': 1443037184,
+
+      // Quantized Data Hints (Approx 4-bit vs 32-bit = ~1/8th size theoretically, but usually less dramatic due to overhead/metadata)
+      'vision_transformer_q4.onnx.data': 205902848, // ~1/8th
+      'llm_q4.onnx.data': 180379648 // ~1/8th
     };
 
     let size = await this.fetchContentLength(path);
     if (size === null) {
-      size = sizeHints[filename] ?? 64 * 1024 * 1024;
+      size = sizeHints[filename] ?? sizeHints[baseFilename] ?? 64 * 1024 * 1024;
     }
 
     // Account for external data if present.
@@ -255,210 +284,112 @@ export class VLMInferenceEngine {
     return Math.floor(singleBufferLimit * 0.95);
   }
 
-  private async buildStrategyPlan(): Promise<Array<{
-    name: 'ALL_GPU' | 'LLM_GPU' | 'VISION_GPU' | 'CPU_ONLY';
-    providers: {
-      VISION_PATCH_EMBED: string[];
-      VISION_TRANSFORMER: string[];
-      VISION_PROJECTOR: string[];
-      TEXT_EMBED: string[];
-      LLM: string[];
-    };
-  }>> {
-    if (typeof navigator === 'undefined') return [{
-      name: 'CPU_ONLY',
-      providers: {
-        VISION_PATCH_EMBED: ['wasm'],
-        VISION_TRANSFORMER: ['wasm'],
-        VISION_PROJECTOR: ['wasm'],
-        TEXT_EMBED: ['wasm'],
-        LLM: ['wasm']
-      }
-    }];
-
-    if (!('gpu' in navigator)) {
-      console.warn("[VLM] WebGPU not supported. Using CPU_ONLY.");
-      return [{
-        name: 'CPU_ONLY',
-        providers: {
-          VISION_PATCH_EMBED: ['wasm'],
-          VISION_TRANSFORMER: ['wasm'],
-          VISION_PROJECTOR: ['wasm'],
-          TEXT_EMBED: ['wasm'],
-          LLM: ['wasm']
-        }
-      }];
-    }
-
-    const adapter = await navigator.gpu.requestAdapter({ powerPreference: 'high-performance' });
-    if (!adapter) {
-      console.warn("[VLM] No WebGPU adapter found. Using CPU_ONLY.");
-      return [{
-        name: 'CPU_ONLY',
-        providers: {
-          VISION_PATCH_EMBED: ['wasm'],
-          VISION_TRANSFORMER: ['wasm'],
-          VISION_PROJECTOR: ['wasm'],
-          TEXT_EMBED: ['wasm'],
-          LLM: ['wasm']
-        }
-      }];
-    }
-
-    const gpuBudget = this.estimateGpuBudgetBytes(adapter);
-    const deviceMemory = (navigator as any).deviceMemory || 4;
-    console.log(`[VLM] Detected Resources: DeviceMemory ~${deviceMemory}GB, GPU budget ~${(gpuBudget / 1024 / 1024).toFixed(0)}MB`);
-
-    // Safety Margin Check
-    // Total approx static size: ~3.5GB.
-    // Inference overhead (KV cache, buffers): ~1.0GB+
-    // Total required for ALL_GPU: ~4.5GB - 5.0GB
-
-    // If deviceMemory < 8, likely a shared memory system (Apple Silicon / iGPU) with tight constraints.
-    // Or if gpuBudget is oddly small.
-    let allowAllGpu = true;
-
-    // Conservative check: if system has 4GB or less RAM, definitely don't try ALL_GPU.
-    if (deviceMemory <= 4) {
-      console.warn("[VLM] Device memory too low (<=4GB) for ALL_GPU. Disabling.");
-      allowAllGpu = false;
-    }
-
-    // "Margin of Error" requested by user:
-    // If we are on the edge, safer to fallback to Balanced/LLM_GPU.
-    // If we can't reliably determine >6GB memory, we should be cautious.
-
-    // We'll trust the process: if it crashes, the reload recovery handles it. 
-    // BUT we can help by checking if we have already crashed before? 
-    // (Engine doesn't know about session history, but Demo does).
-
-    const strategies: Array<{
-      name: 'ALL_GPU' | 'LLM_GPU' | 'VISION_GPU' | 'CPU_ONLY';
-      providers: {
-        VISION_PATCH_EMBED: string[];
-        VISION_TRANSFORMER: string[];
-        VISION_PROJECTOR: string[];
-        TEXT_EMBED: string[];
-        LLM: string[];
-      };
-    }> = [];
-
-    // 1. ALL_GPU (Best Performance, but high memory)
-    if (allowAllGpu) {
-      strategies.push({
-        name: 'ALL_GPU',
-        providers: {
-          VISION_PATCH_EMBED: ['webgpu', 'wasm'],
-          VISION_TRANSFORMER: ['webgpu', 'wasm'],
-          VISION_PROJECTOR: ['webgpu', 'wasm'],
-          TEXT_EMBED: ['webgpu', 'wasm'],
-          LLM: ['webgpu', 'wasm']
-        }
-      });
-    } else {
-      // If we skipped ALL_GPU, we might still include it at the end? Or just skip?
-      // Better to skip to enforce margin.
-    }
-
-    // 2. LLM_GPU (Balanced: LLM is heaviest compute, Vision on CPU saves VRAM)
-    // Vision ~1.7GB (Transformer) + 100MB (Projector) -> Moves ~1.8GB to System RAM.
-    // LLM ~1.4GB + Overhead -> stays on GPU. 
-    // This is much safer for 4GB VRAM cards.
-    strategies.push({
-      name: 'LLM_GPU',
-      providers: {
-        VISION_PATCH_EMBED: ['wasm'],
-        VISION_TRANSFORMER: ['wasm'],
-        VISION_PROJECTOR: ['wasm'],
-        TEXT_EMBED: ['webgpu', 'wasm'],
-        LLM: ['webgpu', 'wasm']
-      }
-    });
-
-    // 3. CPU_ONLY (Universal Fallback)
-    strategies.push({
-      name: 'CPU_ONLY',
-      providers: {
-        VISION_PATCH_EMBED: ['wasm'],
-        VISION_TRANSFORMER: ['wasm'],
-        VISION_PROJECTOR: ['wasm'],
-        TEXT_EMBED: ['wasm'],
-        LLM: ['wasm']
-      }
-    });
-
-    return strategies;
+  private async buildStrategyPlan() {
+    // Deprecated in favor of fixed 5-stage granular strategy
+    // We rely on the external "retry-reload" loop to find the right strategy
+    return [];
   }
 
-  public async init(onProgress?: (status: string, progress?: number) => void) {
+  public async init(onProgress?: (status: string, progress?: number) => void, onCheckpoint?: (phase: string) => void) {
     if (this.initialized) return;
-    if (this.loading) {
-      console.warn("[VLM] Initialization already in progress...");
-      return;
+
+    // If initialization is already in progress, wait for it.
+    if (this.initPromise) {
+      return this.initPromise;
     }
 
-    this.loading = true;
-    try {
-      // Ensure clean state before starting
-      await this.dispose();
+    // Start new initialization
+    this.initPromise = (async () => {
+      this.loading = true;
+      try {
+        // Ensure clean state before starting
+        await this.dispose();
 
-      // Simplify Init Logic: Just use current strategy
-      await this.initStrategy(null, onProgress);
+        // Simplify Init Logic: Just use current strategy
+        await this.initStrategy(null, onProgress, onCheckpoint);
 
 
-      if (onProgress) onProgress("Loading Tokenizer...", 90);
-      this.tokenizer = await AutoTokenizer.from_pretrained(MODEL_CONFIG.PADDLE_VL_ID);
+        if (onProgress) onProgress("Loading Tokenizer...", 90);
+        this.tokenizer = await AutoTokenizer.from_pretrained(MODEL_CONFIG.PADDLE_VL_ID);
 
-      // Load Pos Embed (small NPY)
-      const filename = MODEL_CONFIG.VLM_COMPONENTS.POS_EMBED;
-      const origin = typeof window !== 'undefined' ? window.location.origin : self.location.origin;
-      const path = `${origin}/models/vlm/${filename}`;
-      const response = await fetch(path);
-      const buffer = await response.arrayBuffer();
-      this.posEmbed = parseNpy(buffer);
+        // Load Pos Embed (small NPY)
+        const filename = MODEL_CONFIG.VLM_COMPONENTS.POS_EMBED;
+        const origin = typeof window !== 'undefined' ? window.location.origin : self.location.origin;
+        const path = `${origin}/models/vlm/${filename}`;
+        const response = await fetch(path);
+        const buffer = await response.arrayBuffer();
+        this.posEmbed = parseNpy(buffer);
 
-      this.initialized = true;
-      if (onProgress) onProgress("Ready", 100);
-    } catch (e) {
-      console.error("[VLM] Fatal initialization error:", e);
-      throw e;
-    } finally {
-      this.loading = false;
-    }
+        this.initialized = true;
+        if (onProgress) onProgress("Ready", 100);
+      } catch (e) {
+        console.error("[VLM] Fatal initialization error:", e);
+        throw e;
+      } finally {
+        this.loading = false;
+        this.initPromise = null;
+      }
+    })();
+
+    return this.initPromise;
   }
 
   private async initStrategy(
     // We ignore the passed strategy argument now as we use internal state
     _ignoredResultStrat?: any,
-    onProgress?: (status: string, progress?: number) => void
+    onProgress?: (status: string, progress?: number) => void,
+    onCheckpoint?: (phase: string) => void
   ) {
     const strat = this.currentStrategy;
-    console.log(`[VLM] Initializing with Active Strategy: ${strat}`);
+    console.log(`[VLM] Initializing with Active Strategy (${this.currentStrategyIndex + 1}/${this.strategies.length}): ${strat}`);
 
-    // Map strategy to providers
-    const isCpu = strat === 'CPU_ONLY';
-    const isLlmGpu = strat === 'LLM_GPU';
-
-    // Providers lists
     const gpu = ['webgpu', 'wasm'];
     const cpu = ['wasm'];
 
-    // LLM_GPU: LLM on GPU, Vision on CPU (Prioritizing LLM VRAM usage)
-    // All GPU: All GPU
-    // CPU: All CPU
+    let visionProviders = gpu;
+    let textEmbedProviders = gpu;
+    let llmProviders = gpu;
 
-    const visionProviders = (isCpu || isLlmGpu) ? cpu : gpu;
-    const llmProviders = isCpu ? cpu : gpu;
+    switch (strat) {
+      case 'ALL_GPU':
+        // Everything GPU
+        break;
+      case 'ALL_GPU_NO_EMBED':
+        // TextEmbed on CPU
+        textEmbedProviders = cpu;
+        break;
+      case 'LLM_GPU':
+        // Vision on CPU
+        visionProviders = cpu;
+        break;
+      case 'LLM_ONLY_GPU':
+        // Vision and TextEmbed on CPU
+        visionProviders = cpu;
+        textEmbedProviders = cpu;
+        break;
+      case 'CPU_ONLY':
+        visionProviders = cpu;
+        textEmbedProviders = cpu;
+        llmProviders = cpu;
+        break;
+    }
 
-    // Load models sequentially - PRIORITIZING LLM FIRST
-    // This ensures if VRAM is tight, LLM gets it first.
+    // Load models sequentially - PRIORITIZING LLM FIRST (Fail Fast)
 
-    await this.loadModel('TEXT_EMBED', 'textEmbedSession', llmProviders, onProgress);
+    // 1. Text Embed (Small, but needed for LLM)
+    if (onCheckpoint) onCheckpoint('LOADING_TEXT_EMBED');
+    await this.loadModel('TEXT_EMBED', 'textEmbedSession', textEmbedProviders, onProgress);
     await new Promise(r => setTimeout(r, 50));
 
+    // 2. LLM (Largest Model)
+    // If this crashes, we know GPU can't handle the LLM at all -> CPU_ONLY
+    if (onCheckpoint) onCheckpoint('LOADING_LLM');
     await this.loadModel('LLM', 'llmSession', llmProviders, onProgress);
     await new Promise(r => setTimeout(r, 50));
 
+    // 3. Vision Components (Large)
+    // If this crashes, LLM fit but Vision didn't -> LLM_GPU (Vision on CPU)
+    if (onCheckpoint) onCheckpoint('LOADING_VISION');
     await this.loadModel('VISION_PATCH_EMBED', 'patchEmbedSession', visionProviders, onProgress);
     await new Promise(r => setTimeout(r, 50));
 
@@ -467,6 +398,9 @@ export class VLMInferenceEngine {
 
     await this.loadModel('VISION_PROJECTOR', 'visionProjectorSession', visionProviders, onProgress);
     await new Promise(r => setTimeout(r, 50));
+
+    if (onCheckpoint) onCheckpoint('READY');
+
   }
 
   public setStrategyIndex(index: number) {
@@ -479,61 +413,40 @@ export class VLMInferenceEngine {
     return this.currentStrategyIndex;
   }
 
-  public async inferVLM(imageBlob: Blob, prompt: string = "Describe this image."): Promise<VLMInferenceResult> {
-    const MAX_RETRIES = 3;
+  // New property to track inference status
+  private inferenceInProgress: boolean = false;
 
-    for (let attempt = 0; attempt < MAX_RETRIES; attempt++) {
-      try {
-        return await this.executePipeline(imageBlob, prompt);
-      } catch (error) {
-        console.error(`[VLM] Inference Attempt ${attempt + 1} Failed:`, error);
+  // Helper to get inference lock (simple boolean for now)
+  private getInferenceLock(): boolean {
+    return this.inferenceInProgress;
+  }
 
-        const err = error instanceof Error ? error : new Error(String(error));
-        // Check for fatal WASM/Environment errors that require a full page reload
-        if (err.message && (err.message.includes("Aborted()") || err.message.includes("valid external Instance"))) {
-          throw new Error("FATAL_RELOAD_NEEDED");
-        }
+  public async runInference(imageBlob: Blob, prompt: string = "Describe this image.", onToken?: TokenCallback): Promise<VLMInferenceResult> {
+    const lock = this.getInferenceLock();
+    if (lock) throw new Error("Inference already in progress");
 
-        // Check if it's a recoverable GPU error (including raw numeric codes)
-        if (this.isGpuError(error) && this.canDowngrade()) {
-          console.warn(`[VLM] GPU OOM/Crash/WASM Error detected (${error}). Downgrading strategy and restarting...`);
+    this.inferenceInProgress = true;
+    try {
+      return await this.executePipeline(imageBlob, prompt, onToken);
+    } catch (error) {
+      console.error(`[VLM] Inference Failed:`, error);
+      const err = error instanceof Error ? error : new Error(String(error));
 
-          // 1. Downgrade
-          this.downgradeStrategy();
-
-          // 2. Dispose everything (Context likely dead)
-          await this.dispose();
-
-          // 3. Re-Init
-          // Note: We don't have the original progress callback here, logs will suffice.
-          console.log("[VLM] Re-initializing models...");
-          try {
-            await this.init();
-            // 4. Retry loop will run execution again
-            continue;
-          } catch (reinitError) {
-            console.error("[VLM] Re-initialization failed:", reinitError);
-            const reinitErr = reinitError as Error;
-            if (reinitErr.message && (reinitErr.message.includes("Aborted()") || reinitErr.message.includes("valid external Instance"))) {
-              throw new Error("FATAL_RELOAD_NEEDED");
-            }
-            // If re-init failed, we might want to try downgrading AGAIN if possible?
-            if (!this.initialized && this.canDowngrade()) {
-              this.downgradeStrategy();
-              await this.dispose();
-              try {
-                await this.init();
-                continue;
-              } catch (e) { throw new Error("FATAL_RELOAD_NEEDED"); }
-            }
-            throw reinitError;
-          }
-        }
-
-        throw error; // Not recoverable
+      // Check for fatal WASM/Environment errors
+      if (err.message && (err.message.includes("Aborted()") || err.message.includes("valid external Instance"))) {
+        throw new Error("FATAL_RELOAD_NEEDED");
       }
+
+      // Check for GPU OOM/Crash
+      if (this.isGpuError(error)) {
+        console.warn(`[VLM] GPU Error detected (${error}). Requesting Fatal Reload.`);
+        throw new Error("FATAL_RELOAD_NEEDED");
+      }
+
+      throw error;
+    } finally {
+      this.inferenceInProgress = false;
     }
-    throw new Error("Max retries exceeded");
   }
 
   private isGpuError(e: unknown): boolean {
@@ -562,18 +475,7 @@ export class VLMInferenceEngine {
     return false;
   }
 
-  private canDowngrade(): boolean {
-    return this.currentStrategyIndex < this.strategies.length - 1;
-  }
-
-  private downgradeStrategy() {
-    if (this.canDowngrade()) {
-      this.currentStrategyIndex++;
-      console.log(`[VLM] Downgraded to Strategy: ${this.currentStrategy}`);
-    }
-  }
-
-  private async executePipeline(imageBlob: Blob, prompt: string): Promise<VLMInferenceResult> {
+  private async executePipeline(imageBlob: Blob, prompt: string, onToken?: TokenCallback): Promise<VLMInferenceResult> {
     if (!this.initialized) throw new Error("Engine not initialized");
 
     const timings: Record<string, number> = {};
@@ -596,7 +498,7 @@ export class VLMInferenceEngine {
     const t2 = performance.now();
 
     // Run LLM Pipeline
-    const markdown = await this.runLLMPipeline(imageEmbeds, prompt);
+    const markdown = await this.runLLMPipeline(imageEmbeds, prompt, onToken);
 
     timings['generation'] = performance.now() - t2;
 
@@ -607,11 +509,12 @@ export class VLMInferenceEngine {
   }
 
   private async runVisionPipeline(pixelValues: Tensor): Promise<Tensor> {
-    // Patch Embed
+    // 1. Patch Embed
     const patchRes = await this.patchEmbedSession!.run({ 'pixel_values': pixelValues });
     const patchFeatures = patchRes['patch_features'];
 
-    // Add Pos Embed
+    // 2. Add Pos Embed (Still on CPU for now as it's a simple addition)
+    // TODO: Move this to a WebGPU shader or custom op for true zero-copy
     const patchData = patchFeatures.data as Float32Array;
     const posData = this.posEmbed!.data as Float32Array;
     const enrichedFeatures = new Float32Array(patchData.length);
@@ -620,16 +523,23 @@ export class VLMInferenceEngine {
     }
     const enrichedTensor = new Tensor('float32', enrichedFeatures, [1, 729, 1152]);
 
-    // Transformer
-    const transRes = await this.visionTransformerSession!.run({ 'inputs_embeds': enrichedTensor });
+    // 3. Transformer & Projector with IO-Binding
+    // We want the output of Transformer to stay on GPU for the Projector
+    const transRes = await this.visionTransformerSession!.run(
+      { 'inputs_embeds': enrichedTensor },
+      { preferredOutputLocation: 'gpu-buffer' } as any
+    );
     const lastHidden = transRes['last_hidden_state'];
 
-    // Projector
-    const projRes = await this.visionProjectorSession!.run({ 'image_features': lastHidden });
+    // Projector runs on the GPU buffer directly
+    const projRes = await this.visionProjectorSession!.run(
+      { 'image_features': lastHidden },
+      { preferredOutputLocation: 'gpu-buffer' } as any
+    );
     return projRes['projected_features'];
   }
 
-  private async runLLMPipeline(imageEmbeds: Tensor, prompt: string): Promise<string> {
+  private async runLLMPipeline(imageEmbeds: Tensor, prompt: string, onToken?: TokenCallback): Promise<string> {
     // 3. Text Embedding & Concat
     const { input_ids } = await this.tokenizer!(prompt, { return_tensor: false, padding: true, truncation: true });
     const inputIdsTensor = new Tensor('int64', BigInt64Array.from((input_ids as number[]).map(BigInt)), [1, (input_ids as number[]).length]);
@@ -638,7 +548,10 @@ export class VLMInferenceEngine {
     const textEmbeds = textEmbedRes['inputs_embeds'];
 
     // Concat
-    const imgData = imageEmbeds.data as Float32Array;
+    // Note: Concat is currently on CPU because imageEmbeds might be on GPU buffer, 
+    // but textEmbeds is likely on CPU. Interleaving WebGPU buffers is complex in standard ORT-Web without custom shaders.
+    // However, LLM run is the most expensive part.
+    const imgData = await imageEmbeds.getData() as Float32Array;
     const txtData = textEmbeds.data as Float32Array;
     const hiddenDim = imageEmbeds.dims[2];
     const combinedLen = (imageEmbeds.dims[1] + textEmbeds.dims[1]) * hiddenDim;
@@ -649,73 +562,66 @@ export class VLMInferenceEngine {
     const combinedEmbeds = new Tensor('float32', combinedData, [1, imageEmbeds.dims[1] + textEmbeds.dims[1], hiddenDim]);
 
     // 4. Generation Loop
-    const seqLen = combinedEmbeds.dims[1];
-    const attentionMask = new Tensor('int64', new BigInt64Array(seqLen).fill(1n), [1, seqLen]);
-    const positionIds = new Tensor('int64', BigInt64Array.from({ length: seqLen }, (_, i) => BigInt(i)), [1, seqLen]);
-
     let currentEmbeds = combinedEmbeds;
-    let feeds: Record<string, Tensor> = {
-      'inputs_embeds': currentEmbeds,
-      'attention_mask': attentionMask,
-      'position_ids': positionIds
-    };
-
     const generatedIds: number[] = [];
     const MAX_NEW_TOKENS = 128;
-    // let pastIds = input_ids as number[]; // unused now
 
-    // Initial run
-    const res = await this.llmSession!.run(feeds);
-    let logits = res['logits'];
-    let lastLogits = (logits.data as Float32Array).slice(logits.data.length - logits.dims[2]);
-    let nextId = argmax(lastLogits);
-    generatedIds.push(nextId);
-    // pastIds.push(nextId);
-
-    // Loop
     for (let i = 0; i < MAX_NEW_TOKENS; i++) {
-      // Optimization: If user cancels or something, we should break. 
-      // But for now just standard loop.
+      const seqLen = currentEmbeds.dims[1];
+      const attentionMask = new Tensor('int64', new BigInt64Array(seqLen).fill(1n), [1, seqLen]);
+      const positionIds = new Tensor('int64', BigInt64Array.from({ length: seqLen }, (_, i) => BigInt(i)), [1, seqLen]);
+
+      const feeds = {
+        'inputs_embeds': currentEmbeds,
+        'attention_mask': attentionMask,
+        'position_ids': positionIds
+      };
+
+      const res = await this.llmSession!.run(feeds);
+      const logits = res['logits'];
+      const lastLogits = (logits.data as Float32Array).slice(logits.data.length - logits.dims[2]);
+      const nextId = argmax(lastLogits);
+
+      if (nextId === this.tokenizer!.eos_token_id) break;
+      generatedIds.push(nextId);
+
+      // Call streaming callback
+      if (onToken) {
+        const decoded = this.tokenizer!.decode([nextId], { skip_special_tokens: true });
+        const fullSoFar = this.tokenizer!.decode(generatedIds, { skip_special_tokens: true });
+        onToken(decoded, fullSoFar);
+      }
+
+      // Append next token embedding
       const nextIdTensor = new Tensor('int64', BigInt64Array.from([BigInt(nextId)]), [1, 1]);
       const nextEmbedRes = await this.textEmbedSession!.run({ 'input_ids': nextIdTensor });
       const nextEmbed = nextEmbedRes['inputs_embeds'];
 
-      const oldData = currentEmbeds.data as Float32Array;
+      const oldData = await currentEmbeds.getData() as Float32Array;
       const newData = nextEmbed.data as Float32Array;
-      const totalLen = oldData.length + newData.length;
-      const fullData = new Float32Array(totalLen);
+      const fullData = new Float32Array(oldData.length + newData.length);
       fullData.set(oldData);
       fullData.set(newData, oldData.length);
 
       currentEmbeds = new Tensor('float32', fullData, [1, currentEmbeds.dims[1] + 1, hiddenDim]);
-
-      const newSeqLen = currentEmbeds.dims[1];
-      const newMask = new Tensor('int64', new BigInt64Array(newSeqLen).fill(1n), [1, newSeqLen]);
-      const newPos = new Tensor('int64', BigInt64Array.from({ length: newSeqLen }, (_, i) => BigInt(i)), [1, newSeqLen]);
-
-      feeds = {
-        'inputs_embeds': currentEmbeds,
-        'attention_mask': newMask,
-        'position_ids': newPos
-      };
-
-      const stepRes = await this.llmSession!.run(feeds);
-      logits = stepRes['logits'];
-      lastLogits = (logits.data as Float32Array).slice(logits.data.length - logits.dims[2]);
-      nextId = argmax(lastLogits);
-
-      if (nextId === this.tokenizer!.eos_token_id) break;
-      generatedIds.push(nextId);
     }
 
     return this.tokenizer!.decode(generatedIds, { skip_special_tokens: true });
   }
+
   public async dispose() {
-    await this.releaseSession('patchEmbedSession');
-    await this.releaseSession('visionTransformerSession');
-    await this.releaseSession('visionProjectorSession');
-    await this.releaseSession('textEmbedSession');
-    await this.releaseSession('llmSession');
+    if (this.patchEmbedSession) await this.patchEmbedSession.release();
+    if (this.visionTransformerSession) await this.visionTransformerSession.release();
+    if (this.visionProjectorSession) await this.visionProjectorSession.release();
+    if (this.textEmbedSession) await this.textEmbedSession.release();
+    if (this.llmSession) await this.llmSession.release();
+
+    this.patchEmbedSession = null;
+    this.visionTransformerSession = null;
+    this.visionProjectorSession = null;
+    this.textEmbedSession = null;
+    this.llmSession = null;
+
     this.initialized = false;
     this.posEmbed = null;
     this.tokenizer = null;

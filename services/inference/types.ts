@@ -43,6 +43,8 @@ export interface VLMInferenceResult {
   timings?: Record<string, number>;
 }
 
+export type TokenCallback = (token: string, fullText: string) => void;
+
 export interface SamplingOptions {
   do_sample?: boolean;
   temperature?: number;

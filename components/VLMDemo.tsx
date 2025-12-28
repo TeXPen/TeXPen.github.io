@@ -1,9 +1,27 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { VLMInferenceEngine } from '../services/inference/VLMInferenceEngine';
 import { VLMInferenceResult } from '../services/inference/types';
 
 const vlmEngine = new VLMInferenceEngine();
+
+const blobToBase64 = (blob: Blob): Promise<string> => {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
+};
+
+const forceReload = () => {
+    console.log("Forcing reload...");
+    try {
+        window.location.reload();
+    } catch (e) {
+        console.error("Standard reload failed, forcing location assignment", e);
+        window.location.href = window.location.href;
+    }
+};
 
 export const VLMDemo: React.FC = () => {
     const [image, setImage] = useState<Blob | null>(null);
@@ -16,13 +34,91 @@ export const VLMDemo: React.FC = () => {
 
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Restoration Effect
     useEffect(() => {
-        // Init engine on mount (or first interaction)
+        const restoreState = async () => {
+            const flag = sessionStorage.getItem("vlm_restore_needed");
+            if (flag === "true") {
+                console.log("[VLMDemo] restoring state after reload...");
+                setStatus("Restoring previous session...");
+
+                const savedPrompt = sessionStorage.getItem("vlm_prompt");
+                const savedImageB64 = sessionStorage.getItem("vlm_image");
+                const savedStrategy = sessionStorage.getItem("vlm_next_strategy");
+
+                if (savedPrompt) setPrompt(savedPrompt);
+
+                if (savedStrategy) {
+                    const idx = parseInt(savedStrategy, 10);
+                    if (!isNaN(idx)) {
+                        console.log(`[VLMDemo] Forcing strategy index: ${idx}`);
+                        vlmEngine.setStrategyIndex(idx);
+                    }
+                }
+
+                if (savedImageB64) {
+                    try {
+                        const res = await fetch(savedImageB64);
+                        const blob = await res.blob();
+                        setImage(blob);
+                        setImagePreview(savedImageB64);
+
+                        // Auto-run?
+                        if (sessionStorage.getItem("vlm_autorun") === "true") {
+                            setTimeout(() => handleRun(blob, savedPrompt || "Describe this image."), 500);
+                        }
+                    } catch (e) {
+                        console.error("Failed to restore image", e);
+                    }
+                }
+
+                // Cleanup
+                sessionStorage.removeItem("vlm_restore_needed");
+                sessionStorage.removeItem("vlm_prompt");
+                sessionStorage.removeItem("vlm_image");
+                sessionStorage.removeItem("vlm_next_strategy");
+                sessionStorage.removeItem("vlm_autorun");
+            }
+        };
+
+        restoreState();
+
+        const unhandledHandler = (event: PromiseRejectionEvent) => {
+            const reason = event.reason;
+            console.error("[VLMDemo] Uncaught Promise Rejection:", reason);
+            const msg = reason instanceof Error ? reason.message : String(reason);
+            if (msg && (
+                msg.includes("valid external Instance") ||
+                msg.includes("Aborted()") ||
+                msg.includes("out of memory") ||
+                msg.includes("createBuffer")
+            )) {
+                event.preventDefault();
+                sessionStorage.setItem("vlm_restore_needed", "true");
+                sessionStorage.setItem("vlm_autorun", "true");
+
+                const currentIdx = vlmEngine.getStrategyIndex();
+                sessionStorage.setItem("vlm_next_strategy", (currentIdx + 1).toString());
+
+                // Use robust reload
+                forceReload();
+            }
+        };
+
+        window.addEventListener("unhandledrejection", unhandledHandler);
+
         return () => {
-            // cleanup if needed
+            window.removeEventListener("unhandledrejection", unhandledHandler);
             vlmEngine.dispose();
         };
     }, []);
+
+    // Keep a ref to image for the event listener (state is stale in useEffect)
+    const imageRef = useRef<Blob | null>(null);
+    const promptRef = useRef<string>("");
+
+    useEffect(() => { imageRef.current = image; }, [image]);
+    useEffect(() => { promptRef.current = prompt; }, [prompt]);
 
     const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -33,10 +129,48 @@ export const VLMDemo: React.FC = () => {
         }
     };
 
-    const handleRun = async () => {
-        if (!image) return;
+    const handleReloadRecovery = async (currentImage: Blob, currentPrompt: string) => {
+        setStatus("Critical Error. Preparing to reload...");
+
+        // Prepare state to save
+        const saveState = async () => {
+            try {
+                const b64 = await blobToBase64(currentImage);
+                sessionStorage.setItem("vlm_image", b64);
+            } catch (e) {
+                console.error("Failed to save image during crash recovery", e);
+            }
+            sessionStorage.setItem("vlm_restore_needed", "true");
+            sessionStorage.setItem("vlm_prompt", currentPrompt);
+            sessionStorage.setItem("vlm_autorun", "true");
+
+            const currentIdx = vlmEngine.getStrategyIndex();
+            // Downgrade for next run
+            sessionStorage.setItem("vlm_next_strategy", (currentIdx + 1).toString());
+        };
+
+        // Race: Try to save, but reload anyway after 500ms
+        const timeout = new Promise((resolve) => setTimeout(resolve, 500));
+
+        try {
+            await Promise.race([saveState(), timeout]);
+            console.log("State save attempt finished (or timed out). Reloading.");
+            forceReload();
+        } catch (e) {
+            console.error("Recovery logic failed", e);
+            forceReload(); // Last resort
+        }
+    };
+
+    const handleRun = async (imgOverride?: Blob, promptOverride?: string) => {
+        const imgToUse = imgOverride || image;
+        const promptToUse = promptOverride || prompt;
+
+        if (!imgToUse) return;
+
         setLoading(true);
         setStatus("Initializing...");
+        let fatal = false;
         try {
             await vlmEngine.init((s, p) => {
                 setStatus(s);
@@ -44,14 +178,34 @@ export const VLMDemo: React.FC = () => {
             });
 
             setStatus("Running Inference...");
-            const res = await vlmEngine.inferVLM(image, prompt);
+            const res = await vlmEngine.inferVLM(imgToUse, promptToUse);
             setResult(res);
             setStatus("Done");
         } catch (e) {
             console.error(e);
-            setStatus("Error: " + (e as Error).message);
+            let errMsg = "";
+            let isFatal = false;
+
+            if (e instanceof Error) {
+                errMsg = e.message;
+            } else {
+                errMsg = String(e);
+            }
+
+            // Catch specific strings OR the custom error
+            if (errMsg === "FATAL_RELOAD_NEEDED" ||
+                errMsg.includes("Aborted") ||
+                errMsg.includes("valid external Instance")
+            ) {
+                fatal = true;
+                await handleReloadRecovery(imgToUse, promptToUse);
+            } else {
+                setStatus("Error: " + errMsg);
+            }
         } finally {
-            setLoading(false);
+            if (!fatal) {
+                setLoading(false);
+            }
         }
     };
 
@@ -93,7 +247,7 @@ export const VLMDemo: React.FC = () => {
 
                     <button
                         className={`w-full py-2 px-4 rounded font-bold text-white transition ${loading || !image ? 'bg-gray-400 cursor-not-allowed' : 'bg-blue-600 hover:bg-blue-700'}`}
-                        onClick={handleRun}
+                        onClick={() => handleRun()}
                         disabled={loading || !image}
                     >
                         {loading ? 'Processing...' : 'Run Inference'}

@@ -166,10 +166,10 @@ export class VLMInferenceEngine {
   }
 
   // Strategy definitions
-  private strategies: ('ALL_GPU' | 'BALANCED' | 'CPU_ONLY')[] = ['ALL_GPU', 'BALANCED', 'CPU_ONLY'];
+  private strategies: ('ALL_GPU' | 'LLM_GPU' | 'CPU_ONLY')[] = ['ALL_GPU', 'LLM_GPU', 'CPU_ONLY'];
   private currentStrategyIndex = 0; // Default to ALL_GPU
 
-  private get currentStrategy(): 'ALL_GPU' | 'BALANCED' | 'CPU_ONLY' {
+  private get currentStrategy(): 'ALL_GPU' | 'LLM_GPU' | 'CPU_ONLY' {
     return this.strategies[this.currentStrategyIndex];
   }
 
@@ -309,8 +309,28 @@ export class VLMInferenceEngine {
     const deviceMemory = (navigator as any).deviceMemory || 4;
     console.log(`[VLM] Detected Resources: DeviceMemory ~${deviceMemory}GB, GPU budget ~${(gpuBudget / 1024 / 1024).toFixed(0)}MB`);
 
+    // Safety Margin Check
+    // Total approx static size: ~3.5GB.
+    // Inference overhead (KV cache, buffers): ~1.0GB+
+    // Total required for ALL_GPU: ~4.5GB - 5.0GB
 
+    // If deviceMemory < 8, likely a shared memory system (Apple Silicon / iGPU) with tight constraints.
+    // Or if gpuBudget is oddly small.
+    let allowAllGpu = true;
 
+    // Conservative check: if system has 4GB or less RAM, definitely don't try ALL_GPU.
+    if (deviceMemory <= 4) {
+      console.warn("[VLM] Device memory too low (<=4GB) for ALL_GPU. Disabling.");
+      allowAllGpu = false;
+    }
+
+    // "Margin of Error" requested by user:
+    // If we are on the edge, safer to fallback to Balanced/LLM_GPU.
+    // If we can't reliably determine >6GB memory, we should be cautious.
+
+    // We'll trust the process: if it crashes, the reload recovery handles it. 
+    // BUT we can help by checking if we have already crashed before? 
+    // (Engine doesn't know about session history, but Demo does).
 
     const strategies: Array<{
       name: 'ALL_GPU' | 'LLM_GPU' | 'VISION_GPU' | 'CPU_ONLY';
@@ -323,20 +343,27 @@ export class VLMInferenceEngine {
       };
     }> = [];
 
-    // User requested aggressive loading: Try most powerful config first, fallback on error.
-    // 1. ALL_GPU (Best Performance)
-    strategies.push({
-      name: 'ALL_GPU',
-      providers: {
-        VISION_PATCH_EMBED: ['webgpu', 'wasm'],
-        VISION_TRANSFORMER: ['webgpu', 'wasm'],
-        VISION_PROJECTOR: ['webgpu', 'wasm'],
-        TEXT_EMBED: ['webgpu', 'wasm'],
-        LLM: ['webgpu', 'wasm']
-      }
-    });
+    // 1. ALL_GPU (Best Performance, but high memory)
+    if (allowAllGpu) {
+      strategies.push({
+        name: 'ALL_GPU',
+        providers: {
+          VISION_PATCH_EMBED: ['webgpu', 'wasm'],
+          VISION_TRANSFORMER: ['webgpu', 'wasm'],
+          VISION_PROJECTOR: ['webgpu', 'wasm'],
+          TEXT_EMBED: ['webgpu', 'wasm'],
+          LLM: ['webgpu', 'wasm']
+        }
+      });
+    } else {
+      // If we skipped ALL_GPU, we might still include it at the end? Or just skip?
+      // Better to skip to enforce margin.
+    }
 
     // 2. LLM_GPU (Balanced: LLM is heaviest compute, Vision on CPU saves VRAM)
+    // Vision ~1.7GB (Transformer) + 100MB (Projector) -> Moves ~1.8GB to System RAM.
+    // LLM ~1.4GB + Overhead -> stays on GPU. 
+    // This is much safer for 4GB VRAM cards.
     strategies.push({
       name: 'LLM_GPU',
       providers: {
@@ -410,20 +437,28 @@ export class VLMInferenceEngine {
 
     // Map strategy to providers
     const isCpu = strat === 'CPU_ONLY';
-    const isBalanced = strat === 'BALANCED';
+    const isLlmGpu = strat === 'LLM_GPU';
 
     // Providers lists
     const gpu = ['webgpu', 'wasm'];
     const cpu = ['wasm'];
 
-    // Balanced: Vision on GPU, LLM on CPU
+    // LLM_GPU: LLM on GPU, Vision on CPU (Prioritizing LLM VRAM usage)
     // All GPU: All GPU
     // CPU: All CPU
 
-    const visionProviders = isCpu ? cpu : gpu;
-    const llmProviders = (isCpu || isBalanced) ? cpu : gpu;
+    const visionProviders = (isCpu || isLlmGpu) ? cpu : gpu;
+    const llmProviders = isCpu ? cpu : gpu;
 
-    // Load models sequentially
+    // Load models sequentially - PRIORITIZING LLM FIRST
+    // This ensures if VRAM is tight, LLM gets it first.
+
+    await this.loadModel('TEXT_EMBED', 'textEmbedSession', llmProviders, onProgress);
+    await new Promise(r => setTimeout(r, 50));
+
+    await this.loadModel('LLM', 'llmSession', llmProviders, onProgress);
+    await new Promise(r => setTimeout(r, 50));
+
     await this.loadModel('VISION_PATCH_EMBED', 'patchEmbedSession', visionProviders, onProgress);
     await new Promise(r => setTimeout(r, 50));
 
@@ -432,12 +467,16 @@ export class VLMInferenceEngine {
 
     await this.loadModel('VISION_PROJECTOR', 'visionProjectorSession', visionProviders, onProgress);
     await new Promise(r => setTimeout(r, 50));
+  }
 
-    await this.loadModel('TEXT_EMBED', 'textEmbedSession', llmProviders, onProgress);
-    await new Promise(r => setTimeout(r, 50));
+  public setStrategyIndex(index: number) {
+    if (index >= 0 && index < this.strategies.length) {
+      this.currentStrategyIndex = index;
+    }
+  }
 
-    await this.loadModel('LLM', 'llmSession', llmProviders, onProgress);
-    await new Promise(r => setTimeout(r, 50));
+  public getStrategyIndex(): number {
+    return this.currentStrategyIndex;
   }
 
   public async inferVLM(imageBlob: Blob, prompt: string = "Describe this image."): Promise<VLMInferenceResult> {
@@ -449,9 +488,15 @@ export class VLMInferenceEngine {
       } catch (error) {
         console.error(`[VLM] Inference Attempt ${attempt + 1} Failed:`, error);
 
-        // Check if it's a recoverable GPU error
-        if (this.isGpuError(error as Error) && this.canDowngrade()) {
-          console.warn("[VLM] GPU OOM/Crash detected. Downgrading strategy and restarting...");
+        const err = error instanceof Error ? error : new Error(String(error));
+        // Check for fatal WASM/Environment errors that require a full page reload
+        if (err.message && (err.message.includes("Aborted()") || err.message.includes("valid external Instance"))) {
+          throw new Error("FATAL_RELOAD_NEEDED");
+        }
+
+        // Check if it's a recoverable GPU error (including raw numeric codes)
+        if (this.isGpuError(error) && this.canDowngrade()) {
+          console.warn(`[VLM] GPU OOM/Crash/WASM Error detected (${error}). Downgrading strategy and restarting...`);
 
           // 1. Downgrade
           this.downgradeStrategy();
@@ -462,10 +507,27 @@ export class VLMInferenceEngine {
           // 3. Re-Init
           // Note: We don't have the original progress callback here, logs will suffice.
           console.log("[VLM] Re-initializing models...");
-          await this.init();
-
-          // 4. Retry loop will run execution again
-          continue;
+          try {
+            await this.init();
+            // 4. Retry loop will run execution again
+            continue;
+          } catch (reinitError) {
+            console.error("[VLM] Re-initialization failed:", reinitError);
+            const reinitErr = reinitError as Error;
+            if (reinitErr.message && (reinitErr.message.includes("Aborted()") || reinitErr.message.includes("valid external Instance"))) {
+              throw new Error("FATAL_RELOAD_NEEDED");
+            }
+            // If re-init failed, we might want to try downgrading AGAIN if possible?
+            if (!this.initialized && this.canDowngrade()) {
+              this.downgradeStrategy();
+              await this.dispose();
+              try {
+                await this.init();
+                continue;
+              } catch (e) { throw new Error("FATAL_RELOAD_NEEDED"); }
+            }
+            throw reinitError;
+          }
         }
 
         throw error; // Not recoverable
@@ -474,13 +536,30 @@ export class VLMInferenceEngine {
     throw new Error("Max retries exceeded");
   }
 
-  private isGpuError(e: Error): boolean {
-    const msg = (e.message || "").toLowerCase();
-    return msg.includes("createbuffer") ||
+  private isGpuError(e: unknown): boolean {
+    let msg = "";
+    if (e instanceof Error) {
+      msg = e.message;
+    } else if (typeof e === 'string') {
+      msg = e;
+    } else {
+      msg = String(e);
+    }
+    msg = msg.toLowerCase();
+
+    if (msg.includes("createbuffer") ||
       msg.includes("out of memory") ||
       msg.includes("context lost") ||
       msg.includes("device lost") ||
-      msg.includes("too large");
+      msg.includes("too large")) {
+      return true;
+    }
+
+    // Treat numeric error codes (like WASM pointers or exit codes) as GPU/Resource errors
+    if (typeof e === 'number') return true;
+    if (typeof e === 'string' && /^\d+$/.test(e.trim())) return true;
+
+    return false;
   }
 
   private canDowngrade(): boolean {

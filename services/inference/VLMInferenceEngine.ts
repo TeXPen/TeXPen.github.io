@@ -552,33 +552,65 @@ export class VLMInferenceEngine {
   }
 
   private async runLLMPipeline(imageEmbeds: Tensor, prompt: string, onToken?: TokenCallback, signal?: AbortSignal): Promise<string> {
-    // 3. Text Embedding & Concat
-    const { input_ids } = await this.tokenizer!(prompt, { return_tensor: false, padding: true, truncation: true });
-    const inputIdsTensor = new Tensor('int64', BigInt64Array.from((input_ids as number[]).map(BigInt)), [1, (input_ids as number[]).length]);
+    // 3. Text Embedding & Concat with Prompt Template
+    // Template: <s>User: <|IMAGE_START|><|IMAGE_PLACEHOLDER|><|IMAGE_END|>{prompt}\nAssistant: 
+    const fullPrompt = `<s>User: <|IMAGE_START|><|IMAGE_PLACEHOLDER|><|IMAGE_END|>${prompt}\nAssistant: `;
+    const { input_ids } = await this.tokenizer!(fullPrompt, { return_tensor: false, padding: false, truncation: true });
+    const ids = input_ids as number[];
 
+    // Identify placeholder ID to correctly splice image embeddings
+    const placeholderRes = await this.tokenizer!("<|IMAGE_PLACEHOLDER|>", { return_tensor: false, add_special_tokens: false });
+    const placeholderId = (placeholderRes.input_ids as number[])[0];
+    const placeholderIdx = ids.indexOf(placeholderId);
+
+    const inputIdsTensor = new Tensor('int64', BigInt64Array.from(ids.map(BigInt)), [1, ids.length]);
     const textEmbedRes = await this.textEmbedSession!.run({ 'input_ids': inputIdsTensor });
     const textEmbeds = textEmbedRes['inputs_embeds'];
 
-    // Concat
-    // Note: Concat is currently on CPU because imageEmbeds might be on GPU buffer, 
-    // but textEmbeds is likely on CPU. Interleaving WebGPU buffers is complex in standard ORT-Web without custom shaders.
-    // However, LLM run is the most expensive part.
-    const imgData = await imageEmbeds.getData() as Float32Array;
-    const txtData = await textEmbeds.getData() as Float32Array;
     const hiddenDim = imageEmbeds.dims[2];
-    const combinedLen = (imageEmbeds.dims[1] + textEmbeds.dims[1]) * hiddenDim;
-    const combinedData = new Float32Array(combinedLen);
-    combinedData.set(imgData);
-    combinedData.set(txtData, imgData.length);
+    const imgLen = imageEmbeds.dims[1];
+    const txtLen = textEmbeds.dims[1];
 
-    const combinedEmbeds = new Tensor('float32', combinedData, [1, imageEmbeds.dims[1] + textEmbeds.dims[1], hiddenDim]);
+    let combinedEmbeds: Tensor;
+
+    if (placeholderIdx !== -1) {
+      // Splice image embeddings into the placeholder position
+      const txtData = await textEmbeds.getData() as Float32Array;
+      const imgData = await imageEmbeds.getData() as Float32Array;
+
+      const combinedLen = (txtLen - 1 + imgLen) * hiddenDim;
+      const combinedData = new Float32Array(combinedLen);
+
+      // Prefix (0 to placeholderIdx)
+      const prefixCount = placeholderIdx * hiddenDim;
+      combinedData.set(txtData.subarray(0, prefixCount));
+
+      // Image (replace placeholder)
+      combinedData.set(imgData, prefixCount);
+
+      // Suffix (placeholderIdx + 1 to end)
+      const suffixStart = (placeholderIdx + 1) * hiddenDim;
+      combinedData.set(txtData.subarray(suffixStart), prefixCount + imgData.length);
+
+      combinedEmbeds = new Tensor('float32', combinedData, [1, txtLen - 1 + imgLen, hiddenDim]);
+      console.log(`[VLM] Injected ${imgLen} image tokens at position ${placeholderIdx}. Sequence length: ${txtLen - 1 + imgLen}`);
+    } else {
+      // Fallback: prepend if placeholder not found (shouldn't happen with our template)
+      const imgData = await imageEmbeds.getData() as Float32Array;
+      const txtData = await textEmbeds.getData() as Float32Array;
+      const combinedData = new Float32Array(imgData.length + txtData.length);
+      combinedData.set(imgData);
+      combinedData.set(txtData, imgData.length);
+      combinedEmbeds = new Tensor('float32', combinedData, [1, imgLen + txtLen, hiddenDim]);
+      console.warn("[VLM] Placeholder not found in prompt tokens, fallback to prepending.");
+    }
 
     // 4. Generation Loop
     let currentEmbeds = combinedEmbeds;
     const generatedIds: number[] = [];
-    const MAX_NEW_TOKENS = 256; // Increased but loop must be efficient
+    const MAX_NEW_TOKENS = 512; // Increased for longer document responses
 
-    console.log(`[VLM] Starting LLM Generation Loop. Input Tokens: ${textEmbeds.dims[1]}`);
+    console.log(`[VLM] Starting LLM Generation Loop. Input Tokens: ${combinedEmbeds.dims[1]}`);
 
     for (let i = 0; i < MAX_NEW_TOKENS; i++) {
       if (signal?.aborted) throw new Error("Aborted");

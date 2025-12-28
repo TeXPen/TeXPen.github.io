@@ -29,9 +29,9 @@ export const MODEL_CONFIG = {
 
   LATEX_DET_MODEL: 'mfd-v20240618.onnx',
 
-  IMAGE_SIZE: 224, // Updated to match preprocess
-  MEAN: [0.485, 0.456, 0.406], // Update to match preprocess (ImageNet stats usually)
-  STD: [0.229, 0.224, 0.225],
+  IMAGE_SIZE: 378,
+  MEAN: [0.5, 0.5, 0.5],
+  STD: [0.5, 0.5, 0.5],
 
   // Input/Output Names
   ENCODER_INPUT_NAME: 'pixel_values',

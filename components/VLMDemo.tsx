@@ -296,6 +296,15 @@ export const VLMDemo: React.FC = () => {
         }
     };
 
+    const handleAbort = async () => {
+        try {
+            setStatus("Aborting...");
+            await vlmEngine.abort();
+        } catch (e) {
+            console.error("Abort failed", e);
+        }
+    };
+
     return (
         <div className="container mx-auto p-4 max-w-4xl">
             <h1 className="text-3xl font-bold mb-6">PaddleOCR-VL Local Demo</h1>
@@ -340,6 +349,15 @@ export const VLMDemo: React.FC = () => {
                         >
                             {loading ? 'Processing...' : 'Run Inference'}
                         </button>
+                        {loading && (
+                            <button
+                                className="py-2 px-4 rounded font-bold text-white bg-red-600 hover:bg-red-700 transition"
+                                onClick={handleAbort}
+                                title="Stop generation"
+                            >
+                                Stop
+                            </button>
+                        )}
                         <button
                             className="py-2 px-4 rounded font-bold text-gray-700 bg-gray-200 hover:bg-gray-300 transition dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
                             onClick={async () => {

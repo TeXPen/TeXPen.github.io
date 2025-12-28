@@ -14,6 +14,14 @@ export class VLMWorkerClient {
     // Vite-style worker import
     this.worker = new Worker(new URL('./VLM.worker.ts', import.meta.url), { type: 'module' });
     this.worker.onmessage = this.handleMessage.bind(this);
+    this.worker.onerror = (err) => {
+      console.error("[VLMWorkerClient] Worker Error (Hard Crash):", err);
+      // Reject all pending promises on crash
+      for (const [id, reject] of this.rejecters.entries()) {
+        reject(new Error("VLM_WORKER_CRASHED: " + (err.message || "Unknown error")));
+        this.cleanup(id);
+      }
+    };
   }
 
   private handleMessage(e: MessageEvent) {
@@ -42,6 +50,13 @@ export class VLMWorkerClient {
         const resolve = this.resolvers.get(id);
         if (resolve) {
           resolve(payload);
+          this.cleanup(id);
+        }
+        break;
+      case 'ABORTED':
+        const rejectAbort = this.rejecters.get(id);
+        if (rejectAbort) {
+          rejectAbort(new Error("Aborted"));
           this.cleanup(id);
         }
         break;
@@ -101,6 +116,12 @@ export class VLMWorkerClient {
 
   public async dispose(): Promise<void> {
     const { promise } = this.createRequest('DISPOSE');
+    return promise;
+  }
+
+  public async abort(): Promise<void> {
+    // This sends a high-priority abort to the worker, which signals the current inference engine run to stop.
+    const { promise } = this.createRequest('ABORT');
     return promise;
   }
 

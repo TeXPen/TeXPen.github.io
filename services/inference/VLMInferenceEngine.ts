@@ -421,14 +421,18 @@ export class VLMInferenceEngine {
     return this.inferenceInProgress;
   }
 
-  public async runInference(imageBlob: Blob, prompt: string = "Describe this image.", onToken?: TokenCallback): Promise<VLMInferenceResult> {
+  public async runInference(imageBlob: Blob, prompt: string = "Describe this image.", onToken?: TokenCallback, signal?: AbortSignal): Promise<VLMInferenceResult> {
     const lock = this.getInferenceLock();
     if (lock) throw new Error("Inference already in progress");
 
     this.inferenceInProgress = true;
     try {
-      return await this.executePipeline(imageBlob, prompt, onToken);
+      return await this.executePipeline(imageBlob, prompt, onToken, signal);
     } catch (error) {
+      if (error instanceof Error && error.message === "Aborted") {
+        console.log("[VLM] Inference Aborted");
+        throw error;
+      }
       console.error(`[VLM] Inference Failed:`, error);
       const err = error instanceof Error ? error : new Error(String(error));
 
@@ -475,13 +479,14 @@ export class VLMInferenceEngine {
     return false;
   }
 
-  private async executePipeline(imageBlob: Blob, prompt: string, onToken?: TokenCallback): Promise<VLMInferenceResult> {
+  private async executePipeline(imageBlob: Blob, prompt: string, onToken?: TokenCallback, signal?: AbortSignal): Promise<VLMInferenceResult> {
     if (!this.initialized) throw new Error("Engine not initialized");
 
     const timings: Record<string, number> = {};
     const t0 = performance.now();
 
     // 1. Preprocess Image
+    if (signal?.aborted) throw new Error("Aborted");
     const pixelValues = await preprocessPaddleVL(imageBlob);
     timings['preprocess'] = performance.now() - t0;
 
@@ -490,6 +495,7 @@ export class VLMInferenceEngine {
 
     // Run Vision Pipeline
     // Sessions are already loaded (either GPU or CPU fallback)
+    if (signal?.aborted) throw new Error("Aborted");
     const imageEmbeds = await this.runVisionPipeline(pixelValues);
 
     timings['vision_encoder'] = performance.now() - t1;
@@ -498,7 +504,8 @@ export class VLMInferenceEngine {
     const t2 = performance.now();
 
     // Run LLM Pipeline
-    const markdown = await this.runLLMPipeline(imageEmbeds, prompt, onToken);
+    if (signal?.aborted) throw new Error("Aborted");
+    const markdown = await this.runLLMPipeline(imageEmbeds, prompt, onToken, signal);
 
     timings['generation'] = performance.now() - t2;
 
@@ -539,7 +546,7 @@ export class VLMInferenceEngine {
     return projRes['projected_features'];
   }
 
-  private async runLLMPipeline(imageEmbeds: Tensor, prompt: string, onToken?: TokenCallback): Promise<string> {
+  private async runLLMPipeline(imageEmbeds: Tensor, prompt: string, onToken?: TokenCallback, signal?: AbortSignal): Promise<string> {
     // 3. Text Embedding & Concat
     const { input_ids } = await this.tokenizer!(prompt, { return_tensor: false, padding: true, truncation: true });
     const inputIdsTensor = new Tensor('int64', BigInt64Array.from((input_ids as number[]).map(BigInt)), [1, (input_ids as number[]).length]);
@@ -552,7 +559,7 @@ export class VLMInferenceEngine {
     // but textEmbeds is likely on CPU. Interleaving WebGPU buffers is complex in standard ORT-Web without custom shaders.
     // However, LLM run is the most expensive part.
     const imgData = await imageEmbeds.getData() as Float32Array;
-    const txtData = textEmbeds.data as Float32Array;
+    const txtData = await textEmbeds.getData() as Float32Array;
     const hiddenDim = imageEmbeds.dims[2];
     const combinedLen = (imageEmbeds.dims[1] + textEmbeds.dims[1]) * hiddenDim;
     const combinedData = new Float32Array(combinedLen);
@@ -564,9 +571,13 @@ export class VLMInferenceEngine {
     // 4. Generation Loop
     let currentEmbeds = combinedEmbeds;
     const generatedIds: number[] = [];
-    const MAX_NEW_TOKENS = 128;
+    const MAX_NEW_TOKENS = 256; // Increased but loop must be efficient
+
+    console.log(`[VLM] Starting LLM Generation Loop. Input Tokens: ${textEmbeds.dims[1]}`);
 
     for (let i = 0; i < MAX_NEW_TOKENS; i++) {
+      if (signal?.aborted) throw new Error("Aborted");
+
       const seqLen = currentEmbeds.dims[1];
       const attentionMask = new Tensor('int64', new BigInt64Array(seqLen).fill(1n), [1, seqLen]);
       const positionIds = new Tensor('int64', BigInt64Array.from({ length: seqLen }, (_, i) => BigInt(i)), [1, seqLen]);
@@ -577,10 +588,17 @@ export class VLMInferenceEngine {
         'position_ids': positionIds
       };
 
+      const stepT0 = performance.now();
       const res = await this.llmSession!.run(feeds);
       const logits = res['logits'];
-      const lastLogits = (logits.data as Float32Array).slice(logits.data.length - logits.dims[2]);
+      const logitsData = await logits.getData() as Float32Array;
+      const lastLogits = logitsData.slice(logitsData.length - logits.dims[2]);
       const nextId = argmax(lastLogits);
+
+      const stepTime = performance.now() - stepT0;
+      if (i % 10 === 0) {
+        console.log(`[VLM] Gen Step ${i}: ${stepTime.toFixed(1)}ms. Token: ${nextId}`);
+      }
 
       if (nextId === this.tokenizer!.eos_token_id) break;
       generatedIds.push(nextId);
@@ -598,12 +616,26 @@ export class VLMInferenceEngine {
       const nextEmbed = nextEmbedRes['inputs_embeds'];
 
       const oldData = await currentEmbeds.getData() as Float32Array;
-      const newData = nextEmbed.data as Float32Array;
+      const newData = await nextEmbed.getData() as Float32Array;
       const fullData = new Float32Array(oldData.length + newData.length);
       fullData.set(oldData);
       fullData.set(newData, oldData.length);
 
+      const prevEmbeds = currentEmbeds;
       currentEmbeds = new Tensor('float32', fullData, [1, currentEmbeds.dims[1] + 1, hiddenDim]);
+
+      // Cleanup intermediate tensors in loop
+      if (prevEmbeds !== combinedEmbeds) {
+        // Only dispose if it's not the original combinedEmbeds we use as starting point
+        // In ORT, disposing a tensor used as input to a finished run is safe.
+        // Wait, currentEmbeds is a NEW tensor every loop.
+        (prevEmbeds as any).dispose?.();
+      }
+      (nextIdTensor as any).dispose?.();
+      (nextEmbed as any).dispose?.();
+      (attentionMask as any).dispose?.();
+      (positionIds as any).dispose?.();
+      (logits as any).dispose?.();
     }
 
     return this.tokenizer!.decode(generatedIds, { skip_special_tokens: true });

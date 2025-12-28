@@ -2,6 +2,8 @@ import { VLMInferenceEngine } from "./VLMInferenceEngine";
 
 const engine = new VLMInferenceEngine();
 
+let currentAbortController: AbortController | null = null;
+
 self.onmessage = async (e: MessageEvent) => {
   const { type, payload, id } = e.data;
 
@@ -21,14 +23,35 @@ self.onmessage = async (e: MessageEvent) => {
 
       case 'RUN_INFERENCE':
         const { imageBlob, prompt } = payload;
-        const result = await engine.runInference(
-          imageBlob,
-          prompt,
-          (token, fullText) => {
-            self.postMessage({ type: 'TOKEN', payload: { token, fullText, id } });
+        currentAbortController = new AbortController();
+        try {
+          const result = await engine.runInference(
+            imageBlob,
+            prompt,
+            (token, fullText) => {
+              self.postMessage({ type: 'TOKEN', payload: { token, fullText, id } });
+            },
+            currentAbortController.signal
+          );
+          self.postMessage({ type: 'INFERENCE_DONE', payload: result, id });
+        } catch (inferError) {
+          if (inferError instanceof Error && inferError.message === "Aborted") {
+            self.postMessage({ type: 'ABORTED', id });
+          } else {
+            throw inferError;
           }
-        );
-        self.postMessage({ type: 'INFERENCE_DONE', payload: result, id });
+        } finally {
+          currentAbortController = null;
+        }
+        break;
+
+      case 'ABORT':
+        if (currentAbortController) {
+          currentAbortController.abort();
+          self.postMessage({ type: 'SUCCESS', id });
+        } else {
+          self.postMessage({ type: 'SUCCESS', id, payload: { info: 'No active inference to abort' } });
+        }
         break;
 
       case 'SET_STRATEGY':

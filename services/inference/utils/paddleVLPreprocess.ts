@@ -7,6 +7,7 @@ const PATCH_SIZE = MODEL_CONFIG.VLM_PATCH_SIZE;
 const MERGE_SIZE = MODEL_CONFIG.VLM_MERGE_SIZE;
 const MIN_PIXELS = MODEL_CONFIG.VLM_MIN_PIXELS;
 const MAX_PIXELS = MODEL_CONFIG.VLM_MAX_PIXELS;
+const MAX_TOKENS = MODEL_CONFIG.VLM_MAX_TOKENS;
 
 const RESIZE_FACTOR = PATCH_SIZE * MERGE_SIZE;
 
@@ -45,6 +46,20 @@ function smartResize(height: number, width: number): { height: number; width: nu
   return { height: hBar, width: wBar };
 }
 
+function clampToMaxTokens(height: number, width: number): { height: number; width: number } {
+  const gridH = Math.floor(height / PATCH_SIZE);
+  const gridW = Math.floor(width / PATCH_SIZE);
+  const tokens = gridH * gridW;
+  if (tokens <= MAX_TOKENS) {
+    return { height, width };
+  }
+
+  const scale = Math.sqrt(MAX_TOKENS / tokens);
+  const scaledH = Math.max(RESIZE_FACTOR, Math.floor((height * scale) / RESIZE_FACTOR) * RESIZE_FACTOR);
+  const scaledW = Math.max(RESIZE_FACTOR, Math.floor((width * scale) / RESIZE_FACTOR) * RESIZE_FACTOR);
+  return { height: scaledH, width: scaledW };
+}
+
 export async function preprocessPaddleVL(imageBlob: Blob): Promise<{
   pixelValues: Tensor;
   grid: { t: number; h: number; w: number };
@@ -52,7 +67,8 @@ export async function preprocessPaddleVL(imageBlob: Blob): Promise<{
   const bitmap = await createImageBitmap(imageBlob);
   const { width, height } = bitmap;
 
-  const { height: resizedH, width: resizedW } = smartResize(height, width);
+  const { height: resizedH0, width: resizedW0 } = smartResize(height, width);
+  const { height: resizedH, width: resizedW } = clampToMaxTokens(resizedH0, resizedW0);
 
   const canvas = new OffscreenCanvas(resizedW, resizedH);
   const ctx = canvas.getContext('2d', { willReadFrequently: true });

@@ -1,14 +1,5 @@
 import os
-import onnx
-import sys
 from onnxruntime.quantization import quantize_dynamic, QuantType, quant_pre_process
-
-try:
-    from onnxruntime.quantization.matmul_4bits_quantizer import MatMul4BitsQuantizer
-
-    HAS_INT4 = True
-except ImportError:
-    HAS_INT4 = False
 
 
 def quantize_sota(input_path, output_path):
@@ -32,34 +23,8 @@ def quantize_sota(input_path, output_path):
 
     model_to_quantize = preprocessed_model_path if used_preprocessed else input_path
 
-    # 2. Try SOTA INT4
-    if HAS_INT4:
-        print("Step 2: Attempting Blockwise INT4 (SOTA)...")
-        try:
-            quantizer = MatMul4BitsQuantizer(
-                model_or_path=model_to_quantize,
-                block_size=128,
-                is_symmetric=True,
-                accuracy_level=None,
-            )
-            quantizer.process()
-            quantizer.model.save_model_to_file(output_path)
-
-            # Cleanup
-            if used_preprocessed and os.path.exists(preprocessed_model_path):
-                os.remove(preprocessed_model_path)
-
-            original_size = os.path.getsize(input_path)
-            new_size = os.path.getsize(output_path)
-            print(
-                f"Success! Reduced from {original_size / 1024 / 1024:.2f}MB to {new_size / 1024 / 1024:.2f}MB"
-            )
-            return
-        except Exception as e:
-            print(f"INT4 Quantization failed: {e}. Falling back to INT8...")
-
-    # 3. Fallback to Enhanced INT8 Dynamic
-    print("Step 2: Running Enhanced Dynamic INT8 (Fallback)...")
+    # 2. Enhanced INT8 Dynamic (SoTA for accuracy/size balance)
+    print("Step 2: Running Enhanced Dynamic INT8...")
     try:
         # "Better than naive":
         # - per_channel=True: Quantize weights per-channel (standard for accuracy)
@@ -92,12 +57,12 @@ def main():
     base_dir = os.path.join(os.path.dirname(__file__), "../public/models/vlm")
 
     targets = [
-        ("vision_transformer.onnx", "vision_transformer_q4.onnx"),
-        ("llm.onnx", "llm_q4.onnx"),
+        ("vision_transformer.onnx", "vision_transformer_q8.onnx"),
+        ("llm_init.onnx", "llm_init_q8.onnx"),
+        ("llm_with_past.onnx", "llm_with_past_q8.onnx"),
     ]
 
-    print("--- Robust Model Quantizer (Pre-Process + Optimized) ---")
-    print(f"INT4 Support Available: {HAS_INT4}")
+    print("--- Robust Model Quantizer (Pre-Process + Optimized INT8) ---")
 
     for src, dst in targets:
         src_path = os.path.join(base_dir, src)

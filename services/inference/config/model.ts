@@ -27,7 +27,7 @@ export const MODEL_CONFIG = {
   // Quantization Settings
   // Quantization Settings
   QUANTIZED: true, // Enable to use quantized variants for large models
-  QUANTIZED_SUFFIX: '_q4.onnx', // Suffix for quantized files. could be '_awq.onnx' if using AutoAWQ export
+  QUANTIZED_SUFFIX: '_q8.onnx', // Suffix for 8-bit quantized files
 
   LATEX_DET_MODEL: 'mfd-v20240618.onnx',
 
@@ -40,7 +40,12 @@ export const MODEL_CONFIG = {
   VLM_MERGE_SIZE: 2,
   VLM_MIN_PIXELS: 28 * 28 * 130,
   VLM_MAX_PIXELS: 28 * 28 * 1280,
+  VLM_MAX_TOKENS: 32 * 32,
   VLM_TOKENS_PER_SECOND: 2,
+
+  // WebGPU strategy thresholds (conservative; browser doesn't expose real VRAM)
+  WEBGPU_ALL_GPU_MIN_GB: 8,
+  WEBGPU_LLM_GPU_MIN_GB: 0,
 
   // Input/Output Names
   ENCODER_INPUT_NAME: 'pixel_values',

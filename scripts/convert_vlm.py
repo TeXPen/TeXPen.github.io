@@ -1,6 +1,7 @@
 import os
 import torch
 from transformers import AutoModel, AutoConfig
+from transformers.cache_utils import DynamicCache
 import transformers.utils as hf_utils
 import transformers.utils.generic as hf_generic
 import numpy as np
@@ -247,12 +248,13 @@ def convert_llm(model, output_dir):
             past = []
             for i in range(num_layers):
                 past.append((past_key_values[2 * i], past_key_values[2 * i + 1]))
+            past_cache = DynamicCache.from_legacy_cache(tuple(past))
 
             outputs = self.model(
                 None,  # input_ids
                 attention_mask,
                 position_ids,
-                tuple(past),
+                past_cache,
                 inputs_embeds,
                 None,  # cache_position
                 True,  # use_cache
@@ -265,19 +267,21 @@ def convert_llm(model, output_dir):
     hidden_size = model.config.hidden_size
     num_layers = model.config.num_hidden_layers
     num_heads = model.config.num_attention_heads
-    head_dim = hidden_size // num_heads
+    num_kv_heads = model.config.num_key_value_heads
+    head_dim = getattr(model.config, "head_dim", hidden_size // num_heads)
 
     seq_len = 32
     past_seq = 16
 
     dummy_embeds = torch.randn(1, seq_len, hidden_size).float()
-    dummy_mask = torch.ones(1, seq_len).float()
+    dummy_mask_init = torch.ones(1, seq_len).float()
+    dummy_mask_with_past = torch.ones(1, past_seq + seq_len).float()
     dummy_pos_ids = torch.arange(seq_len).unsqueeze(0).repeat(3, 1, 1).long()
 
     past_key_values = []
     for _ in range(num_layers):
-        k = torch.zeros(1, num_heads, past_seq, head_dim).float()
-        v = torch.zeros(1, num_heads, past_seq, head_dim).float()
+        k = torch.zeros(1, num_kv_heads, past_seq, head_dim).float()
+        v = torch.zeros(1, num_kv_heads, past_seq, head_dim).float()
         past_key_values.extend([k, v])
 
     # Init model (no past inputs)
@@ -285,7 +289,7 @@ def convert_llm(model, output_dir):
     init_output_names = ["logits"] + _past_input_names(num_layers)
     torch.onnx.export(
         init_wrapper,
-        (dummy_embeds, dummy_mask, dummy_pos_ids),
+        (dummy_embeds, dummy_mask_init, dummy_pos_ids),
         os.path.join(output_dir, "llm_init.onnx"),
         input_names=["inputs_embeds", "attention_mask", "position_ids"],
         output_names=init_output_names,
@@ -305,7 +309,7 @@ def convert_llm(model, output_dir):
     with_past_output_names = ["logits"] + _past_input_names(num_layers)
     torch.onnx.export(
         with_past_wrapper,
-        (dummy_embeds, dummy_mask, dummy_pos_ids, *past_key_values),
+        (dummy_embeds, dummy_mask_with_past, dummy_pos_ids, *past_key_values),
         os.path.join(output_dir, "llm_with_past.onnx"),
         input_names=["inputs_embeds", "attention_mask", "position_ids"] + _past_input_names(num_layers),
         output_names=with_past_output_names,

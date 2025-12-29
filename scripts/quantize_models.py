@@ -1,10 +1,8 @@
 
 import os
-import glob
-import onnx
 from onnxruntime.quantization import quantize_dynamic, QuantType, quantize_matmul_4bits
 
-def quantize_model(input_path, output_path, method='int4'):
+def quantize_model(input_path, output_path, method='int8'):
     print(f"Quantizing {input_path} to {output_path} using {method}...")
     
     if method == 'int4':
@@ -22,7 +20,10 @@ def quantize_model(input_path, output_path, method='int4'):
         quantize_dynamic(
             input_path,
             output_path,
-            weight_type=QuantType.QUInt8
+            weight_type=QuantType.QUInt8,
+            per_channel=True,
+            reduce_range=False,
+            extra_options={"MatMulConstBOnly": True},
         )
     else:
         raise ValueError(f"Unknown method: {method}")
@@ -36,7 +37,8 @@ def main():
     # Models to quantize (Large ones only)
     targets = [
         'vision_transformer.onnx',
-        'llm.onnx'
+        'llm_init.onnx',
+        'llm_with_past.onnx'
     ]
 
     for filename in targets:
@@ -45,9 +47,9 @@ def main():
             print(f"Skipping {filename} (not found)")
             continue
             
-        # Create INT4 version
-        output_path = os.path.join(base_dir, filename.replace('.onnx', '_q4.onnx'))
-        quantize_model(input_path, output_path, method='int4')
+        # Create INT8 version
+        output_path = os.path.join(base_dir, filename.replace('.onnx', '_q8.onnx'))
+        quantize_model(input_path, output_path, method='int8')
 
 if __name__ == "__main__":
     main()

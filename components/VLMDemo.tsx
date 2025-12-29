@@ -23,13 +23,16 @@ const forceReload = () => {
     }
 };
 
+const STRATEGY_LABELS = ['ALL_GPU', 'LLM_GPU', 'CPU_ONLY'] as const;
+const STRATEGY_COUNT = STRATEGY_LABELS.length;
+
 const determineNextStrategy = (currentIdx: number): number => {
-    // With simplified strategies: 0 = ALL_GPU, 1 = CPU_ONLY
-    if (currentIdx === 0) {
-        console.log("-> Jump to CPU_ONLY (Index 1)");
-        return 1;
+    if (currentIdx >= STRATEGY_COUNT - 1) {
+        return currentIdx;
     }
-    return currentIdx + 1;
+    const nextIdx = currentIdx + 1;
+    console.log(`-> Jump to ${STRATEGY_LABELS[nextIdx]} (Index ${nextIdx})`);
+    return nextIdx;
 };
 
 export const VLMDemo: React.FC = () => {
@@ -154,7 +157,7 @@ export const VLMDemo: React.FC = () => {
                 const currentIdx = vlmEngine.getStrategyIndex();
                 const nextIdx = determineNextStrategy(currentIdx);
 
-                if (nextIdx > 1 || (nextIdx === 1 && currentIdx === 1)) {
+                if (nextIdx === currentIdx && currentIdx >= STRATEGY_COUNT - 1) {
                     console.error("All strategies failed. Stopping auto-reload.");
                     setStatus("Critical Error: All recovery strategies failed.");
                     setLoading(false);
@@ -208,7 +211,7 @@ export const VLMDemo: React.FC = () => {
             const currentIdx = vlmEngine.getStrategyIndex();
             const nextIdx = determineNextStrategy(currentIdx);
 
-            if (nextIdx > 1 || (nextIdx === 1 && currentIdx === 1)) {
+            if (nextIdx === currentIdx && currentIdx >= STRATEGY_COUNT - 1) {
                 console.error("All strategies failed. Stopping auto-reload.");
                 setStatus("Critical Error: All recovery strategies failed.");
                 // We don't reload here, just letting the error stay visible
@@ -226,7 +229,7 @@ export const VLMDemo: React.FC = () => {
             const currentIdx = vlmEngine.getStrategyIndex();
             const nextIdx = determineNextStrategy(currentIdx);
 
-            if (nextIdx > 1 || (nextIdx === 1 && currentIdx === 1)) {
+            if (nextIdx === currentIdx && currentIdx >= STRATEGY_COUNT - 1) {
                 console.error("All strategies failed. Stopping auto-reload.");
                 setStatus("Critical Error: All recovery strategies failed.");
                 return;
@@ -382,7 +385,7 @@ export const VLMDemo: React.FC = () => {
                             <div className="flex justify-between items-center mb-1">
                                 <div className="text-sm text-gray-600 dark:text-gray-400">{status}</div>
                                 <div className="text-xs font-bold text-blue-600 uppercase">
-                                    Strategy: {vlmEngine.getStrategyIndex() + 1}/2
+                                    Strategy: {vlmEngine.getStrategyIndex() + 1}/{STRATEGY_COUNT}
                                 </div>
                             </div>
                             <div className="w-full bg-gray-200 rounded-full h-2.5 dark:bg-gray-700">

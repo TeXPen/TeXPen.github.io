@@ -61,6 +61,7 @@ export class VLMInferenceEngine {
   private loading = false;
   private sizeCache: Partial<Record<keyof typeof MODEL_CONFIG.VLM_COMPONENTS, number>> = {};
   private initPromise: Promise<void> | null = null;
+  private sessionProviders: Partial<Record<keyof typeof MODEL_CONFIG.VLM_COMPONENTS, string>> = {};
 
   private sessionOptions: InferenceSession.SessionOptions = {
     executionProviders: ['webgpu', 'wasm'], // Use WebGPU if available
@@ -81,34 +82,64 @@ export class VLMInferenceEngine {
     if (sessionProp && this[sessionProp]) return; // Already loaded
 
     const baseFilename = MODEL_CONFIG.VLM_COMPONENTS[key];
-    let filename: string = baseFilename;
-
-    // Check if this component should be quantized
-    // Typically we only quantize the heavy lifters: Transformer and LLM
-    if (MODEL_CONFIG.QUANTIZED && (key === 'VISION_TRANSFORMER' || key === 'LLM')) {
-      filename = baseFilename.replace('.onnx', MODEL_CONFIG.QUANTIZED_SUFFIX);
-    }
+    const quantizedFilename = baseFilename.replace('.onnx', MODEL_CONFIG.QUANTIZED_SUFFIX);
+    const wantsQuantized = MODEL_CONFIG.QUANTIZED && (key === 'VISION_TRANSFORMER' || key === 'LLM' || key === 'LLM_WITH_PAST');
 
     const origin = typeof window !== 'undefined' ? window.location.origin : self.location.origin;
-    const path = `${origin}/models/vlm/${filename}`;
 
-    if (onProgress) onProgress(`Loading ${key}...`);
+    const fetchModelBuffers = async (targetFilename: string) => {
+      const path = `${origin}/models/vlm/${targetFilename}`;
+      const modelResp = await fetch(path);
+      if (!modelResp.ok) return null;
 
-    try {
-      // Fetch model and potential external data
-      let [modelResp, dataResp] = await Promise.all([
-        fetch(path),
-        fetch(`${path}.data`).then(r => r.ok ? r : null).catch(() => null)
-      ]);
+      const contentType = (modelResp.headers.get('content-type') || '').toLowerCase();
+      if (contentType.startsWith('text/') || contentType.includes('text/html')) {
+        return null;
+      }
 
-      if (!modelResp.ok) throw new Error(`Failed to fetch ${filename}`);
-      let modelBuffer: ArrayBuffer | null = await modelResp.arrayBuffer();
+      const modelBuffer = await modelResp.arrayBuffer();
+      const prefix = new TextDecoder().decode(new Uint8Array(modelBuffer.slice(0, 64)));
+      if (prefix.trimStart().startsWith('<')) {
+        return null;
+      }
 
       let dataBuffer: ArrayBuffer | null = null;
+      const dataResp = await fetch(`${path}.data`).then(r => r.ok ? r : null).catch(() => null);
       if (dataResp && dataResp.ok) {
         dataBuffer = await dataResp.arrayBuffer();
       }
 
+      return { modelBuffer, dataBuffer, filename: targetFilename };
+    };
+
+    let modelBuffer: ArrayBuffer | null = null;
+    let dataBuffer: ArrayBuffer | null = null;
+    let filename = baseFilename;
+
+    if (wantsQuantized) {
+      try {
+        const buffers = await fetchModelBuffers(quantizedFilename);
+        if (buffers) {
+          ({ modelBuffer, dataBuffer, filename } = buffers);
+        } else {
+          console.warn(`[VLM] Quantized model ${quantizedFilename} unavailable or invalid. Falling back to ${baseFilename}.`);
+        }
+      } catch (e) {
+        console.warn(`[VLM] Failed to fetch ${quantizedFilename}. Falling back to ${baseFilename}.`, e);
+      }
+    }
+
+    if (!modelBuffer) {
+      const buffers = await fetchModelBuffers(baseFilename);
+      if (!buffers) {
+        throw new Error(`Failed to fetch ${baseFilename}`);
+      }
+      ({ modelBuffer, dataBuffer, filename } = buffers);
+    }
+
+    if (onProgress) onProgress(`Loading ${key}...`);
+
+    try {
       // Helper to create session with fallback
       const createSession = async (providers: string[]): Promise<InferenceSession> => {
         const options: InferenceSession.SessionOptions = {
@@ -135,10 +166,15 @@ export class VLMInferenceEngine {
         return await InferenceSession.create(new Uint8Array(modelBufferClone), options);
       };
 
+      const setProvider = (provider: string) => {
+        this.sessionProviders[key] = provider;
+      };
+
       try {
         console.log(`[VLM] Attempting to load ${key} with providers: ${providers.join(',')}`);
         const session = await createSession(providers);
         this[sessionProp] = session;
+        setProvider(providers[0] ?? 'wasm');
         console.log(`[VLM] Loaded ${key} on ${providers[0]}`); // Assumption: first is primary
       } catch (gpuError) {
         // If we tried GPU and failed, fallback to CPU
@@ -149,6 +185,7 @@ export class VLMInferenceEngine {
           const session = await createSession(['wasm']);
 
           this[sessionProp] = session;
+          setProvider('wasm');
           console.log(`[VLM] Loaded ${key} on CPU (fallback)`);
         } else {
           throw gpuError; // Already CPU or other fatal error
@@ -181,15 +218,13 @@ export class VLMInferenceEngine {
 
   // Strategy definitions
   // 1. ALL_GPU: All models on WebGPU (Most aggressive, highest VRAM)
-  // 2. ALL_GPU_NO_EMBED: Vision + LLM on GPU, Text Embed on CPU (Save ~300-500MB VRAM)
-  // 3. LLM_GPU: LLM + Text Embed on GPU, Vision on CPU (Standard "Balanced", saves ~1.8GB VRAM)
-  // 4. LLM_ONLY_GPU: LLM on GPU, Vision + Text Embed on CPU (Saves slightly more VRAM than #3)
-  // 5. CPU_ONLY: Everything on CPU (Failsafe)
-  private strategies: ('ALL_GPU' | 'CPU_ONLY')[] = ['ALL_GPU', 'CPU_ONLY'];
+  // 2. LLM_GPU: LLM + Text Embed on GPU, Vision on CPU (Balanced for low VRAM)
+  // 3. CPU_ONLY: Everything on CPU (Failsafe)
+  private strategies: ('ALL_GPU' | 'LLM_GPU' | 'CPU_ONLY')[] = ['ALL_GPU', 'LLM_GPU', 'CPU_ONLY'];
 
   private currentStrategyIndex = 0; // Default to ALL_GPU
 
-  public get currentStrategy(): 'ALL_GPU' | 'CPU_ONLY' {
+  public get currentStrategy(): 'ALL_GPU' | 'LLM_GPU' | 'CPU_ONLY' {
     return this.strategies[this.currentStrategyIndex];
   }
 
@@ -225,7 +260,7 @@ export class VLMInferenceEngine {
 
     const baseFilename = MODEL_CONFIG.VLM_COMPONENTS[key];
     let filename: string = baseFilename;
-    if (MODEL_CONFIG.QUANTIZED && (key === 'VISION_TRANSFORMER' || key === 'LLM')) {
+    if (MODEL_CONFIG.QUANTIZED && (key === 'VISION_TRANSFORMER' || key === 'LLM' || key === 'LLM_WITH_PAST')) {
       filename = baseFilename.replace('.onnx', MODEL_CONFIG.QUANTIZED_SUFFIX);
     }
 
@@ -242,7 +277,10 @@ export class VLMInferenceEngine {
       'llm_with_past.onnx': 2079423,
       'pos_embed.npy': 3359360,
 
-      // Quantized Hints (Approx 50% of FP32 or less for INT4)
+      // Quantized Hints (Approx 25% of FP32 for INT8, ~50% for INT4)
+      'vision_transformer_q8.onnx': 1630000,
+      'llm_init_q8.onnx': 1550000,
+      'llm_with_past_q8.onnx': 1550000,
       'vision_transformer_q4.onnx': 1089562,
       'llm_q4.onnx': 1039711
     };
@@ -255,9 +293,12 @@ export class VLMInferenceEngine {
       'llm_init.onnx.data': 1443037184,
       'llm_with_past.onnx.data': 1443037184,
 
-      // Quantized Data Hints (Approx 4-bit vs 32-bit = ~1/8th size theoretically, but usually less dramatic due to overhead/metadata)
-      'vision_transformer_q4.onnx.data': 205902848, // ~1/8th
-      'llm_q4.onnx.data': 180379648 // ~1/8th
+      // Quantized Data Hints (INT8 ~= 1/4 size, INT4 ~= 1/8 size)
+      'vision_transformer_q8.onnx.data': 411805696, // ~1/4
+      'llm_init_q8.onnx.data': 360759296, // ~1/4
+      'llm_with_past_q8.onnx.data': 360759296, // ~1/4
+      'vision_transformer_q4.onnx.data': 205902848, // ~1/8
+      'llm_q4.onnx.data': 180379648 // ~1/8
     };
 
     let size = await this.fetchContentLength(path);
@@ -292,6 +333,64 @@ export class VLMInferenceEngine {
     return Math.floor(singleBufferLimit * 0.95);
   }
 
+  private async selectStrategyFromBudget(onProgress?: (status: string, progress?: number) => void) {
+    if (typeof navigator === 'undefined' || !('gpu' in navigator)) {
+      this.currentStrategyIndex = this.strategies.indexOf('CPU_ONLY');
+      return;
+    }
+
+    const adapter = await navigator.gpu.requestAdapter();
+    if (!adapter) {
+      this.currentStrategyIndex = this.strategies.indexOf('CPU_ONLY');
+      return;
+    }
+
+    const budgetBytes = this.estimateGpuBudgetBytes(adapter);
+    const overheadFactor = 1.25;
+    const minAllGpuBytes = MODEL_CONFIG.WEBGPU_ALL_GPU_MIN_GB * 1024 * 1024 * 1024;
+    const minLlmGpuBytes = MODEL_CONFIG.WEBGPU_LLM_GPU_MIN_GB * 1024 * 1024 * 1024;
+
+    const sumSizes = async (keys: (keyof typeof MODEL_CONFIG.VLM_COMPONENTS)[]) => {
+      let total = 0;
+      for (const key of keys) {
+        total += await this.getComponentSizeBytes(key);
+      }
+      return total;
+    };
+
+    const llmGpuBytes = await sumSizes(['TEXT_EMBED', 'LLM', 'LLM_WITH_PAST']);
+    const allGpuBytes = llmGpuBytes + await sumSizes([
+      'VISION_PATCH_EMBED',
+      'VISION_TRANSFORMER',
+      'VISION_PROJECTOR'
+    ]);
+
+    let chosen: 'ALL_GPU' | 'LLM_GPU' | 'CPU_ONLY';
+    if (budgetBytes >= allGpuBytes * overheadFactor && budgetBytes >= minAllGpuBytes) {
+      chosen = 'ALL_GPU';
+    } else if (budgetBytes >= llmGpuBytes * overheadFactor && budgetBytes >= minLlmGpuBytes) {
+      chosen = 'LLM_GPU';
+    } else {
+      chosen = 'CPU_ONLY';
+    }
+
+    const idx = this.strategies.indexOf(chosen);
+    if (idx >= 0) {
+      this.currentStrategyIndex = idx;
+      if (onProgress) {
+        onProgress(`Auto strategy: ${chosen}`, 5);
+      }
+    }
+
+    console.log(
+      `[VLM] Strategy auto-select: budget=${(budgetBytes / (1024 ** 3)).toFixed(2)}GB ` +
+      `allGpu≈${(allGpuBytes * overheadFactor / (1024 ** 3)).toFixed(2)}GB ` +
+      `llmGpu≈${(llmGpuBytes * overheadFactor / (1024 ** 3)).toFixed(2)}GB ` +
+      `minAll=${MODEL_CONFIG.WEBGPU_ALL_GPU_MIN_GB}GB ` +
+      `minLlm=${MODEL_CONFIG.WEBGPU_LLM_GPU_MIN_GB}GB -> ${chosen}`
+    );
+  }
+
   private async buildStrategyPlan() {
     // Deprecated in favor of fixed 5-stage granular strategy
     // We rely on the external "retry-reload" loop to find the right strategy
@@ -323,6 +422,8 @@ export class VLMInferenceEngine {
         // This dispose() is only for hard resets/recovery. 
         // Normal preloads or multiple calls while loading are handled above.
         await this.dispose();
+
+        await this.selectStrategyFromBudget(onProgress);
 
         // Simplify Init Logic: Just use current strategy
         await this.initStrategy(null, onProgress, onCheckpoint);
@@ -372,8 +473,13 @@ export class VLMInferenceEngine {
 
     switch (strat) {
       case 'ALL_GPU':
-        // Keep LLM/Text on GPU, but force vision to CPU to avoid WebGPU TDRs (e.g. 6583176).
+        // Use WebGPU for vision by default; WASM aborts on some large inputs.
+        visionProviders = gpu;
+        break;
+      case 'LLM_GPU':
         visionProviders = cpu;
+        textEmbedProviders = gpu;
+        llmProviders = gpu;
         break;
       case 'CPU_ONLY':
         visionProviders = cpu;
@@ -555,6 +661,11 @@ export class VLMInferenceEngine {
     }
 
     return false;
+  }
+
+  private isWasmAbortError(e: unknown): boolean {
+    const msg = e instanceof Error ? e.message : String(e);
+    return msg.toLowerCase().includes("aborted()");
   }
 
   private async executePipeline(imageBlob: Blob, prompt: string, onToken?: TokenCallback, signal?: AbortSignal): Promise<VLMInferenceResult> {
@@ -866,9 +977,26 @@ export class VLMInferenceEngine {
     console.log("[VLM] Vision: Running Vision Transformer...");
     console.log(`[VLM] Vision Transformer Input Names: ${this.visionTransformerSession.inputNames}`);
     console.log(`[VLM] Vision Transformer Input Shape: ${enrichedTensor.dims}`);
-    const transRes = await this.visionTransformerSession.run(
-      { 'inputs_embeds': enrichedTensor }
-    );
+    let transRes: Record<string, Tensor>;
+    try {
+      transRes = await this.visionTransformerSession.run(
+        { 'inputs_embeds': enrichedTensor }
+      );
+    } catch (e) {
+      if (this.isWasmAbortError(e) && this.sessionProviders.VISION_TRANSFORMER === 'wasm') {
+        console.warn("[VLM] Vision Transformer crashed on WASM. Retrying on WebGPU...");
+        await this.releaseSession('visionTransformerSession');
+        await this.loadModel('VISION_TRANSFORMER', 'visionTransformerSession', ['webgpu', 'wasm']);
+        if (!this.visionTransformerSession) {
+          throw e;
+        }
+        transRes = await this.visionTransformerSession.run(
+          { 'inputs_embeds': enrichedTensor }
+        );
+      } else {
+        throw e;
+      }
+    }
     const lastHidden = transRes['last_hidden_state'];
     if (!lastHidden) throw new Error("last_hidden_state output is missing");
     console.log(`[VLM] Vision: Transformer Output Shape: ${lastHidden.dims}`);

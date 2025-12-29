@@ -48,4 +48,4 @@ jobs:
         run: |
           echo "## Preview Deployment" >> $GITHUB_STEP_SUMMARY
           echo "The preview for branch **${{ github.ref_name }}** has been deployed." >> $GITHUB_STEP_SUMMARY
-          echo "URL: https://TeXFlow.github.io/TeXPen/${{ steps.branch.outputs.name }}/" >> $GITHUB_STEP_SUMMARY
+          echo "URL: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}/${{ steps.branch.outputs.name }}/" >> $GITHUB_STEP_SUMMARY

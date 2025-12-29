@@ -15,5 +15,6 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: ['./tests/setup.ts'],
     testTimeout: 20000,
+    exclude: ['**/node_modules/**', '**/dist/**', 'PaddleOCR/**'],
   },
 });

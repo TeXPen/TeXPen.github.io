@@ -102,7 +102,7 @@ describe('History Logic', () => {
     const stroke1 = [{ points: [], tool: 'pen', color: 'black', width: 1 } as Stroke];
     const item1: HistoryItem = { id: '1', sessionId, latex: 'A', timestamp: 1, source: 'draw', strokes: stroke1 };
 
-    let history = addToHistoryReducer([], item1);
+    const history = addToHistoryReducer([], item1);
 
     const stroke2 = [{ points: [{ x: 1, y: 1 }], tool: 'pen', color: 'black', width: 1 } as Stroke];
     const item2: HistoryItem = { id: '2', sessionId, latex: 'A', timestamp: 2, source: 'draw', strokes: stroke2 };

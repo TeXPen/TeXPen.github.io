@@ -25,3 +25,13 @@ dist-ssr
 *.sw?
 
 TexTeller/
+_local/
+PaddleOCR/
+
+# Models
+*.onnx
+*.onnx.data
+*.pth
+*.pdparams
+*.wasm
+*.data

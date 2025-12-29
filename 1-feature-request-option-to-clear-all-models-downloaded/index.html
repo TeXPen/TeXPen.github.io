@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>TeXPen</title>
+  <link rel="icon" type="image/svg+xml" href="./favicon.svg" />
+
+  <!-- Google tag (gtag.js) -->
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-SVMCZ3E2BF"></script>
+  <script>
+    window.dataLayer = window.dataLayer || [];
+    function gtag() { dataLayer.push(arguments); }
+    gtag('js', new Date());
+
+    gtag('config', 'G-SVMCZ3E2BF');
+  </script>
+
+  <script>
+    (function () {
+      const saved = localStorage.getItem('texpen_theme');
+      const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+      let shouldBeDark = false;
+      if (saved === 'dark') {
+        shouldBeDark = true;
+      } else if (saved === 'light') {
+        shouldBeDark = false;
+      } else if (prefersDark) {
+        shouldBeDark = true;
+      }
+
+      if (shouldBeDark) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    })();
+  </script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap"
+    rel="stylesheet">
+
+
+
+  <!-- Polyfill -->
+  <!-- Polyfill (Removed due to issues) -->
+  <!-- <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script> -->
+
+  <!-- MathJax -->
+  <script>
+    window.MathJax = {
+      loader: { load: ['[tex]/physics', '[tex]/color', '[tex]/cancel'] },
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        packages: { '[+]': ['ams', 'physics', 'color', 'cancel'] }
+      },
+      svg: { fontCache: 'global' },
+      startup: {
+        typeset: false
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <!-- ONNX Runtime Web -->
+  <!-- ONNX Runtime Web (Bundled) -->
+  <!-- <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web/dist/ort.min.js"></script> -->
+
+
+
+  <script type="importmap">
+{
+  "imports": {
+    "react/": "https://esm.sh/react@^19.2.0/",
+    "react": "https://esm.sh/react@^19.2.0",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.0/"
+  }
+}
+</script>
+  <script type="module" crossorigin src="./assets/index-Cpt1PKnG.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-BORzBHVA.css">
+</head>
+
+<body>
+  <div id="root"></div>
+</body>
+
+</html>

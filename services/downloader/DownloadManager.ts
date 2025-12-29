@@ -248,6 +248,23 @@ export class DownloadManager {
     await cache.delete(url);
     await this.store.deleteFile(url);
   }
+  public async clearCache(): Promise<void> {
+    // 1. Cancel all active downloads
+    for (const url of this.activeDownloads.keys()) {
+      await this.cancelDownload(url);
+    }
+    this.queue = [];
+
+    // 2. Clear Cache API
+    const cache = await this.getCache();
+    const keys = await cache.keys();
+    for (const request of keys) {
+      await cache.delete(request);
+    }
+
+    // 3. Clear IndexedDB
+    await this.store.clearAll();
+  }
 }
 
 export const downloadManager = DownloadManager.getInstance();

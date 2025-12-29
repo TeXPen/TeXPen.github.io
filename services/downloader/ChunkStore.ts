@@ -137,6 +137,14 @@ export class ChunkStore {
     await tx.done;
   }
 
+  public async clearAll() {
+    const db = await this.dbPromise;
+    const tx = db.transaction(['metadata', 'chunks'], 'readwrite');
+    await tx.objectStore('metadata').clear();
+    await tx.objectStore('chunks').clear();
+    await tx.done;
+  }
+
   public async getStream(url: string): Promise<ReadableStream<Uint8Array>> {
     const db = await this.dbPromise;
     const meta = await db.get('metadata', url);

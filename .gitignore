@@ -33,9 +33,18 @@ PaddleOCR/
 *.onnx.data
 *.pth
 *.pdparams
+*.pdiparams
+*.pdmodel
 *.wasm
 *.data
+*.tar
+inference.json
 
 # Specific ignore for PaddleOCR models
 public/models/paddle/*.onnx
 public/models/paddle/.cache/
+
+# Temporary conversion directories
+_temp_paddle_conversion/
+_manual_v5_convert/
+_temp_models/

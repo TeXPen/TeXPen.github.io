@@ -13,4 +13,5 @@ Maintenance
 Performance
 
 Roadmap
-- [ ] TexTeller paragraph OCR
+- [ ] Structured Document OCR (with LaTeX)
+  - [x] VLM uses too much memory, so use small PaddleOCR models in combination

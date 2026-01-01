@@ -35,3 +35,7 @@ PaddleOCR/
 *.pdparams
 *.wasm
 *.data
+
+# Specific ignore for PaddleOCR models
+public/models/paddle/*.onnx
+public/models/paddle/.cache/

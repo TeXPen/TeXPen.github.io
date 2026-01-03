@@ -1,0 +1,15 @@
+INFO: Could not find files for the given pattern(s).
+C:\Users\DefaultUser\AppData\Local\Programs\Python\Python312\Lib\site-packages\paddle\utils\cpp_extension\extension_utils.py:718: UserWarning: No ccache found. Please be aware that recompiling all source files may be required. You can download and install ccache from: https://github.com/ccache/ccache/blob/master/doc/INSTALL.md
+  warnings.warn(warning_message)
+Traceback (most recent call last):
+  File "D:\GitHub\TeXFlow\TeXPen\scripts\test_structure_v3.py", line 21, in <module>
+    from ppstructure.layout.predict_layout import LayoutPredictor
+  File "D:\GitHub\TeXFlow\TeXPen\PaddleOCR\ppstructure\layout\predict_layout.py", line 28, in <module>
+    from ppocr.data import create_operators, transform
+  File "D:\GitHub\TeXFlow\TeXPen\PaddleOCR\ppocr\data\__init__.py", line 35, in <module>
+    from ppocr.data.imaug import transform, create_operators
+  File "D:\GitHub\TeXFlow\TeXPen\PaddleOCR\ppocr\data\imaug\__init__.py", line 19, in <module>
+    from .iaa_augment import IaaAugment
+  File "D:\GitHub\TeXFlow\TeXPen\PaddleOCR\ppocr\data\imaug\iaa_augment.py", line 25, in <module>
+    from albumentations.core.transforms_interface import DualTransform
+ModuleNotFoundError: No module named 'albumentations.core'; 'albumentations' is not a package

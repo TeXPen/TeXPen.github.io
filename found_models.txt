@@ -1,0 +1,23 @@
+Searching for PP-StructureV3 models...
+
+Searching for SLANet models...
+Found model: PaddlePaddle/SLANet_plus
+Found model: PaddlePaddle/SLANet
+
+Searching for Table models...
+Found model: PaddlePaddle/PicoDet_layout_1x_table
+Found model: PaddlePaddle/RT-DETR-L_wired_table_cell_det
+Found model: PaddlePaddle/RT-DETR-L_wireless_table_cell_det
+Found model: PaddlePaddle/PP-LCNet_x1_0_table_cls
+
+Searching for structure models...
+
+Searching for layout models...
+Found model: PaddlePaddle/RT-DETR-H_layout_17cls
+Found model: PaddlePaddle/RT-DETR-H_layout_3cls
+Found model: PaddlePaddle/PicoDet_layout_1x_table
+Found model: PaddlePaddle/PicoDet-S_layout_17cls
+Found model: PaddlePaddle/PicoDet-L_layout_3cls
+Found model: PaddlePaddle/PicoDet-S_layout_3cls
+Found model: PaddlePaddle/PicoDet-L_layout_17cls
+Found model: PaddlePaddle/PicoDet_layout_1x

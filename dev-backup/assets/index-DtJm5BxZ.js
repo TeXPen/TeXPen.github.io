@@ -1,1 +1,0 @@
-import{G as d,M as r}from"./index-BsPgIPHa.js";function o(e){return{device:e,dtype:"fp32",encoder_model_file_name:"encoder_model.onnx",decoder_model_file_name:"decoder_with_past_model.onnx"}}export{d as GENERATION_CONFIG,r as MODEL_CONFIG,o as getSessionOptions};

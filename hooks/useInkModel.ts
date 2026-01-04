@@ -1,10 +1,18 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { ModelConfig, Candidate } from '../types';
+import { Quantization } from '../services/inference/types';
 import { inferenceService } from '../services/inference/InferenceService';
 
 import { MODEL_CONFIG, GENERATION_CONFIG } from '../services/inference/config';
 
-export function useInkModel(theme: 'light' | 'dark', provider: 'webgpu' | 'wasm' | null, customModelId: string = MODEL_CONFIG.ID) {
+export function useInkModel(
+  theme: 'light' | 'dark',
+  provider: 'webgpu' | 'wasm' | null,
+  quantization: Quantization,
+  encoderQuantization: Quantization,
+  decoderQuantization: Quantization,
+  customModelId: string = MODEL_CONFIG.ID
+) {
   // Sampling Defaults
   const [numCandidates, setNumCandidates] = useState<number>(GENERATION_CONFIG.NUM_BEAMS);
   const [doSample, setDoSample] = useState(true); // Default to true for better UX with multiple candidates? Or stick to config? Sticking to hardcoded true for now as per original code logic or Config?
@@ -78,7 +86,11 @@ export function useInkModel(theme: 'light' | 'dark', provider: 'webgpu' | 'wasm'
 
         // Determine which files we expect based on current settings
         if (!provider) return;
-        const sessionOptions = getSessionOptions(provider);
+        const sessionOptions = getSessionOptions(provider, {
+          overall: quantization,
+          encoder: encoderQuantization,
+          decoder: decoderQuantization
+        });
         const expectedFiles = [
           sessionOptions.encoder_model_file_name,
           sessionOptions.decoder_model_file_name
@@ -112,9 +124,9 @@ export function useInkModel(theme: 'light' | 'dark', provider: 'webgpu' | 'wasm'
       }
     }
     checkCache();
-  }, [config.encoderModelUrl, provider]);
+  }, [config.encoderModelUrl, provider, quantization, encoderQuantization, decoderQuantization]);
 
-  const prevSettingsRef = useRef<{ provider: string; modelId: string } | null>(null);
+  const prevSettingsRef = useRef<{ provider: string; modelId: string; quantization: Quantization; encoderQuantization: Quantization; decoderQuantization: Quantization } | null>(null);
 
   useEffect(() => {
     let isCancelled = false;
@@ -150,12 +162,18 @@ export function useInkModel(theme: 'light' | 'dark', provider: 'webgpu' | 'wasm'
           if (progress !== undefined) {
             setProgress(progress);
           }
-        }, { device: provider, modelId: customModelId });
+        }, {
+          device: provider,
+          modelId: customModelId,
+          quantization,
+          encoderQuantization,
+          decoderQuantization,
+        });
 
         if (!isCancelled) {
           setStatus('idle');
           setLoadingPhase('');
-          prevSettingsRef.current = { provider, modelId: customModelId };
+          prevSettingsRef.current = { provider, modelId: customModelId, quantization, encoderQuantization, decoderQuantization };
         }
       } catch (error) {
         if (isCancelled) return;
@@ -181,7 +199,10 @@ export function useInkModel(theme: 'light' | 'dark', provider: 'webgpu' | 'wasm'
       isCancelled = true;
       const settingsChanged = prevSettingsRef.current &&
         (prevSettingsRef.current.provider !== provider ||
-          prevSettingsRef.current.modelId !== customModelId);
+          prevSettingsRef.current.modelId !== customModelId ||
+          prevSettingsRef.current.quantization !== quantization ||
+          prevSettingsRef.current.encoderQuantization !== encoderQuantization ||
+          prevSettingsRef.current.decoderQuantization !== decoderQuantization);
 
       if (settingsChanged && userConfirmed) {
         console.log('[useInkModel] Settings changed, disposing model...');
@@ -190,7 +211,7 @@ export function useInkModel(theme: 'light' | 'dark', provider: 'webgpu' | 'wasm'
         });
       }
     };
-  }, [provider, customModelId, userConfirmed, isLoadedFromCache]);
+  }, [provider, customModelId, quantization, encoderQuantization, decoderQuantization, userConfirmed, isLoadedFromCache]);
 
 
 

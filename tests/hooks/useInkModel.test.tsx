@@ -53,7 +53,7 @@ describe('useInkModel', () => {
     });
 
     it('initializes in idle state', async () => {
-        const { result } = renderHook(() => useInkModel('light', MODEL_CONFIG.PROVIDERS.WASM));
+        const { result } = renderHook(() => useInkModel('light', MODEL_CONFIG.PROVIDERS.WASM, 'int8', 'int8', 'int8'));
         expect(result.current.status).toBe('idle');
         expect(result.current.isInitialized).toBe(false); // Initially false until cache check
 
@@ -72,7 +72,7 @@ describe('useInkModel', () => {
             });
         });
 
-        const { result } = renderHook(() => useInkModel('light', MODEL_CONFIG.PROVIDERS.WASM));
+        const { result } = renderHook(() => useInkModel('light', MODEL_CONFIG.PROVIDERS.WASM, 'int8', 'int8', 'int8'));
 
         await waitFor(() => expect(result.current.isInitialized).toBe(true));
 
@@ -123,7 +123,7 @@ describe('useInkModel', () => {
         // Ensure cache is empty
         mockCache.keys.mockResolvedValue([]);
 
-        const { result } = renderHook(() => useInkModel('light', MODEL_CONFIG.PROVIDERS.WASM));
+        const { result } = renderHook(() => useInkModel('light', MODEL_CONFIG.PROVIDERS.WASM, 'int8', 'int8', 'int8'));
 
         await waitFor(() => expect(result.current.isInitialized).toBe(true));
 
@@ -143,10 +143,10 @@ describe('useInkModel', () => {
     });
 
     it('allows inference when loaded from cache (auto confirmed)', async () => {
-        // Mock cache hit with the expected Q8 files
+        // Mock cache hit with the expected Int8 files
         mockCache.keys.mockResolvedValue([
-            { url: `https://huggingface.co/${MODEL_CONFIG.ID}/resolve/main/onnx/encoder_model.onnx` },
-            { url: `https://huggingface.co/${MODEL_CONFIG.ID}/resolve/main/onnx/decoder_with_past_model.onnx` }
+            { url: `https://huggingface.co/${MODEL_CONFIG.ID}/resolve/main/onnx/encoder_model_int8.onnx` },
+            { url: `https://huggingface.co/${MODEL_CONFIG.ID}/resolve/main/onnx/decoder_model_merged_int8.onnx` }
         ]);
 
         // Mock init to resolve
@@ -155,7 +155,7 @@ describe('useInkModel', () => {
             await new Promise(resolve => setTimeout(resolve, 50));
         });
 
-        const { result } = renderHook(() => useInkModel('light', MODEL_CONFIG.PROVIDERS.WASM));
+        const { result } = renderHook(() => useInkModel('light', MODEL_CONFIG.PROVIDERS.WASM, 'int8', 'int8', 'int8'));
 
         await waitFor(() => {
             expect(result.current.isLoadedFromCache).toBe(true);

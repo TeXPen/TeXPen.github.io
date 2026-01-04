@@ -1,6 +1,7 @@
 Priority
 
 Bugs
+- [ ] Tooltip gets clipped
 
 Behavior
 

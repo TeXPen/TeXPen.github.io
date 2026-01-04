@@ -3,6 +3,7 @@ import { useAppContext } from '../../contexts/AppContext';
 import { useThemeContext } from '../../contexts/ThemeContext';
 import { useHistoryContext } from '../../contexts/HistoryContext';
 import { ProviderSelector } from './ProviderSelector';
+import { QuantizationSelector } from './QuantizationSelector';
 import { useVerifyDownloads } from '../../hooks/useVerifyDownloads';
 
 import { MODEL_CONFIG } from '../../services/inference/config';
@@ -15,7 +16,10 @@ export const SettingsMenu: React.FC = () => {
     const menuRef = useRef<HTMLDivElement>(null);
     const modelIdInputRef = useRef<HTMLInputElement>(null);
     const {
-        // quantization, // usage removed
+        // encoderQuantization, // Removed
+        // setEncoderQuantization, // Removed
+        // decoderQuantization, // Removed
+        // setDecoderQuantization, // Removed
         provider,
         setProvider,
         showPreviewInput,
@@ -117,6 +121,15 @@ export const SettingsMenu: React.FC = () => {
                     <div className="p-3">
                         <div className="text-xs font-bold uppercase text-slate-400 dark:text-white/40 mb-2">Provider</div>
                         <ProviderSelector value={provider} onChange={setProvider} />
+                    </div>
+
+                    <div className="h-px bg-black/5 dark:bg-white/5 mx-2" />
+
+                    {/* Encoder Quantization */}
+                    {/* Model Performance Settings */}
+                    <div className="p-3">
+                        {/* <div className="text-xs font-bold uppercase text-slate-400 dark:text-white/40 mb-2">Performance</div> */}
+                        <QuantizationSelector />
                     </div>
 
                     <div className="h-px bg-black/5 dark:bg-white/5 mx-2" />

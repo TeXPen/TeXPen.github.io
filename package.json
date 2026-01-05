@@ -9,7 +9,9 @@
     "build": "vite build",
     "lint": "eslint . --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "test": "vitest run"
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "ci": "bun run lint && bun run typecheck && bun run test && bun run build"
   },
   "dependencies": {
     "@huggingface/transformers": "^3.8.1",

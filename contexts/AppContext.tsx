@@ -74,8 +74,8 @@ export interface AppContextType {
     loadFromHistory: (item: HistoryItem) => void;
 
     // Tab Interface
-    activeTab: 'draw' | 'upload';
-    setActiveTab: (tab: 'draw' | 'upload') => void;
+    activeTab: 'draw' | 'upload' | 'scan';
+    setActiveTab: (tab: 'draw' | 'upload' | 'scan') => void;
 
     // Session
     sessionId: string;
@@ -88,7 +88,7 @@ export interface AppContextType {
     setShowUploadResult: (show: boolean) => void;
 
     // Inference State
-    activeInferenceTab?: 'draw' | 'upload' | null;
+    activeInferenceTab?: 'draw' | 'upload' | 'scan' | null;
 
     // Custom Notification
     customNotification: { message: string; progress?: number; isLoading?: boolean } | null;

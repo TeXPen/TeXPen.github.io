@@ -12,6 +12,7 @@ import { ProgressToast } from '../common/ProgressToast';
 import PreviewModelInput from '../debug/PreviewModelInput';
 import DrawTab from './DrawTab';
 import UploadTab from './UploadTab';
+import ScanTab from './ScanTab';
 import { MobileBottomNav } from './MobileBottomNav';
 import { ConfirmationDialog } from '../common/ConfirmationDialog';
 
@@ -201,19 +202,20 @@ const Main: React.FC = () => {
                     <div className="flex-1 flex flex-col min-w-0 relative">
                         <Header />
 
-                        {/* Tab Content */}
                         {activeTab === 'draw' ? (
                             <DrawTab
                                 onInference={handleInference}
                                 renderLoadingOverlay={renderLoadingOverlay}
                             />
-                        ) : (
+                        ) : activeTab === 'upload' ? (
                             <UploadTab
                                 onImageSelect={handleImageSelect}
                                 onConvert={handleUploadConvert}
                                 onUploadAnother={handleUploadAnother}
                                 renderLoadingOverlay={renderLoadingOverlay}
                             />
+                        ) : (
+                            <ScanTab renderLoadingOverlay={renderLoadingOverlay} />
                         )}
 
                         <MobileBottomNav />

@@ -8,6 +8,7 @@ import { PenIcon } from '../common/icons/PenIcon';
 import { HamburgerIcon } from '../common/icons/HamburgerIcon';
 import { DrawIcon } from '../common/icons/DrawIcon';
 import { UploadIcon } from '../common/icons/UploadIcon';
+import { ScanIcon } from '../common/icons/ScanIcon';
 import { IconButton } from '../common/IconButton';
 
 const Header: React.FC = () => {
@@ -55,6 +56,13 @@ const Header: React.FC = () => {
                     onClick={() => setActiveTab('upload')}
                     isActive={activeTab === 'upload'}
                     icon={<UploadIcon />}
+                    variant="pill"
+                />
+                <IconButton
+                    label="Scan"
+                    onClick={() => setActiveTab('scan')}
+                    isActive={activeTab === 'scan'}
+                    icon={<ScanIcon />}
                     variant="pill"
                 />
             </div>

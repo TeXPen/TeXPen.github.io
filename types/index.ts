@@ -31,7 +31,7 @@ export interface HistoryItem {
   sessionId: string;
   latex: string;
   timestamp: number;
-  source?: 'draw' | 'upload';
+  source?: 'draw' | 'upload' | 'scan';
   imageData?: string; // Data URL for uploaded images
   strokes?: Stroke[]; // Captured strokes for reconstructing drawing
   versions?: HistoryItem[];

@@ -28,13 +28,14 @@ const initialTabState: TabState = {
 /**
  * Hook for managing tab-specific state (draw/upload tabs have separate state)
  */
-export function useTabState(activeTab: 'draw' | 'upload') {
+export function useTabState(activeTab: 'draw' | 'upload' | 'scan') {
   const [drawState, setDrawState] = useState<TabState>(initialTabState);
   const [uploadState, setUploadState] = useState<TabState>(initialTabState);
+  const [scanState, setScanState] = useState<TabState>(initialTabState);
 
   // Get current active state based on tab
-  const currentState = activeTab === 'draw' ? drawState : uploadState;
-  const setCurrentState = activeTab === 'draw' ? setDrawState : setUploadState;
+  const currentState = activeTab === 'draw' ? drawState : (activeTab === 'upload' ? uploadState : scanState);
+  const setCurrentState = activeTab === 'draw' ? setDrawState : (activeTab === 'upload' ? setUploadState : setScanState);
 
   // Derived values for context consumers
   const latex = currentState.latex;
@@ -112,8 +113,8 @@ export function useTabState(activeTab: 'draw' | 'upload') {
   };
 
   // Track which tab is performing inference
-  const [activeInferenceTab, setActiveInferenceTab] = useState<'draw' | 'upload' | null>(null);
-  const activeRequestsRef = useRef<{ draw: number; upload: number }>({ draw: 0, upload: 0 });
+  const [activeInferenceTab, setActiveInferenceTab] = useState<'draw' | 'upload' | 'scan' | null>(null);
+  const activeRequestsRef = useRef<{ draw: number; upload: number; scan: number }>({ draw: 0, upload: 0, scan: 0 });
 
   const startDrawInference = () => {
     activeRequestsRef.current.draw += 1;

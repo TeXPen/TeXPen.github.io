@@ -23,6 +23,22 @@ export interface LayoutItem {
   confidence: number;
 }
 
+// Configure ONNX Runtime WASM paths immediately on import
+// This avoids race conditions where internal initialization might rely on defaults.
+if (typeof self !== 'undefined') {
+  console.log(`[PaddleOCREngine] Config - crossOriginIsolated: ${self.crossOriginIsolated}`);
+
+  // Point to the files served by vite-plugin-static-copy at root (or public folder)
+  ort.env.wasm.wasmPaths = {
+    'ort-wasm-simd-threaded.wasm': '/ort-wasm-simd-threaded.wasm',
+    'ort-wasm-simd-threaded.jsep.wasm': '/ort-wasm-simd-threaded.jsep.wasm',
+    'ort-wasm-simd-threaded.asyncify.wasm': '/ort-wasm-simd-threaded.asyncify.wasm',
+    'ort-wasm-simd.wasm': '/ort-wasm-simd-threaded.wasm',
+    'ort-wasm.wasm': '/ort-wasm.wasm',
+    'ort-wasm.jsep.wasm': '/ort-wasm-simd-threaded.jsep.wasm', // Fallback/Alias if needed
+  } as any;
+}
+
 export class PaddleOCREngine {
   private layoutSession: ort.InferenceSession | null = null;
   private detSession: ort.InferenceSession | null = null;

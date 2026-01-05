@@ -30,7 +30,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const [customModelId, setCustomModelIdState] = useState<string>(MODEL_CONFIG.ID);
 
     // UI State
-    const [activeTab, setActiveTab] = useState<'draw' | 'upload'>('draw');
+    const [activeTab, setActiveTab] = useState<'draw' | 'upload' | 'scan'>('draw');
     const [isSidebarOpen, setIsSidebarOpen] = useState(() => {
         if (typeof window !== 'undefined') {
             return window.innerWidth >= 768;
